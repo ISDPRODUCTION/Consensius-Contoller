@@ -1,0 +1,19 @@
+{
+  "id": "ff",
+  "name": "Free Fire",
+  "bindings": {
+    "attack": "space",
+    "skill1": "q",
+    "skill2": "e",
+    "skill3": "r"
+  },
+  "controller": {
+    "deadzone": 0.25,
+    "sensitivity": 1.0,
+    "send_rate": 60
+  },
+  "metadata": {
+    "created_at": "2026-06-23 18:58:02",
+    "updated_at": "2026-06-23 18:58:02"
+  }
+}

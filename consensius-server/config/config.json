@@ -1,0 +1,8 @@
+{
+  "port": 8080,
+  "active_profile": "mlbb",
+  "deadzone": 0.25,
+  "send_rate": 60,
+  "invert_x": false,
+  "invert_y": false
+}

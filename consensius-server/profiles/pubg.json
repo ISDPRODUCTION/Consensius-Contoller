@@ -1,0 +1,22 @@
+{
+  "id": "pubg",
+  "name": "PUBG Mobile",
+  "bindings": {
+    "fire": "left_click",
+    "aim": "right_click",
+    "jump": "space",
+    "crouch": "c",
+    "prone": "z",
+    "reload": "r",
+    "interact": "f"
+  },
+  "controller": {
+    "deadzone": 0.15,
+    "sensitivity": 1.2,
+    "send_rate": 60
+  },
+  "metadata": {
+    "created_at": "2026-06-23 18:45:00",
+    "updated_at": "2026-06-23 18:45:00"
+  }
+}
