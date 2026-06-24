@@ -21005,3 +21005,5 @@
 [RX] button recall UP
 [INFO] [BUS] Action: recall -> b (keyboard)
 [INFO] Client Disconnected
+[INFO] Consensius Host stopping backend server...
+[INFO] WebSocket Server Stopped.
