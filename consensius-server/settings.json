@@ -1,0 +1,17 @@
+{
+  "port": 8765,
+  "start_on_launch": true,
+  "mouse_sensitivity": 1.5,
+  "joystick_threshold": 0.3,
+  "invert_x": false,
+  "invert_y": true,
+  "skill_aim_distance": 25,
+  "skill_positions": {
+    "j": {"x": -1, "y": -1},
+    "k": {"x": -1, "y": -1},
+    "l": {"x": -1, "y": -1},
+    "u": {"x": -1, "y": -1},
+    "i": {"x": -1, "y": -1},
+    "f": {"x": -1, "y": -1}
+  }
+}

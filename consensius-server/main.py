@@ -1,125 +1,86 @@
-import sys
-import asyncio
-import threading
-from PySide6.QtWidgets import QApplication
-from core.config_manager import ConfigManager
-from core.profile_manager import ProfileManager
-from core.state_manager import StateManager
-from runtime.input_buffer import InputBuffer
-from runtime.event_logger import EventLogger
-from core.event_bus import EventBus
-from core.input_engine import InputEngine
-from core.input_normalizer import InputNormalizer
-from core.event_inspector import EventInspector
-from network.websocket_server import WebSocketServer
-from ui.dashboard_window import DashboardWindow
-
+"""
+main.py
+=======
+Consensius Server entry point.
+- Loads settings from settings.json
+- Creates WebSocketServer + InputHandler
+- Launches CustomTkinter UI on main thread
+- WebSocket runs in a background daemon thread
+"""
+import json
+import sys  
 from pathlib import Path
 
-def run_async_loop(loop: asyncio.AbstractEventLoop):
-    asyncio.set_event_loop(loop)
-    loop.run_forever()
+BASE_DIR = Path(__file__).resolve().parent
+SETTINGS_FILE = BASE_DIR / "settings.json"
+
+
+def load_settings() -> dict:
+    """
+    Bug 8 fix: If settings.json does not exist on first run, create it with
+    default values so the server never crashes trying to read missing settings.
+    """
+    defaults = {
+        "port":               8765,
+        "start_on_launch":    False,
+        "mouse_sensitivity":  1.0,
+        "joystick_threshold": 0.3,
+        "skill_aim_distance": 80,
+        "invert_x":           False,
+        "invert_y":           True,
+        # skill_positions: maps action key (e.g. "j","k","l") to its screen pixel
+        # position {x, y}. -1 means "not configured, use screen center".
+        # Users set these via Settings → Skill Aim Positions.
+        "skill_positions": {
+            "j": {"x": -1, "y": -1},
+            "k": {"x": -1, "y": -1},
+            "l": {"x": -1, "y": -1},
+            "u": {"x": -1, "y": -1},
+            "i": {"x": -1, "y": -1},
+            "f": {"x": -1, "y": -1},
+        },
+    }
+
+    if not SETTINGS_FILE.exists():
+        # First run: create settings.json with defaults
+        try:
+            SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(SETTINGS_FILE, "w") as f:
+                json.dump(defaults, f, indent=2)
+            print(f"[INFO] Created default settings.json at {SETTINGS_FILE}")
+        except Exception as e:
+            print(f"[WARN] Could not create settings.json: {e}. Using in-memory defaults.")
+        return defaults
+
+    try:
+        with open(SETTINGS_FILE, "r") as f:
+            loaded = json.load(f)
+        # Merge: loaded values override defaults so missing keys always have a value
+        defaults.update(loaded)
+    except Exception as e:
+        print(f"[WARN] Could not load settings.json: {e}. Using defaults.")
+    return defaults
+
 
 def main():
-    BASE_DIR = Path(__file__).resolve().parent
-    
-    # 1. Initialize Event Logger
-    event_logger = EventLogger(logs_dir=str(BASE_DIR / "logs"))
-    event_logger.log_info("Consensius Host Starting...")
-    
-    # 2. Load configuration
-    config_manager = ConfigManager(config_path=str(BASE_DIR / "config" / "config.json"))
-    config = config_manager.load_config()
-    
-    # 3. Load profiles
-    profile_manager = ProfileManager(profiles_dir=str(BASE_DIR / "profiles"))
-    profile_manager.load_profiles()
-    
-    # Set the active profile loaded from the configuration
-    active_profile_key = config.active_profile
-    profile_manager.set_active_profile(active_profile_key)
-    
-    # Get profile name to display in the startup summary
-    active_profile = profile_manager.get_active_profile()
-    active_profile_name = active_profile.name if active_profile else active_profile_key
-    
-    # 4. Create State Manager & Input Buffer
-    state_manager = StateManager()
-    input_buffer = InputBuffer()
-    
-    # 5. Initialize Event Bus, Input Engine and Input Normalizer
-    event_bus = EventBus()
-    input_engine = InputEngine(state_manager, profile_manager, event_bus)
-    input_normalizer = InputNormalizer(config_manager)
-    
-    # Subscribe logger to action events on event bus
-    def log_action_event(data):
-        event_logger.log_info(f"[BUS] Action: {data['action']} -> {data['mapped_key']} ({data['type']})")
-        
-    def log_joystick_event(data):
-        if data['magnitude'] > 0.1: # Only log non-idle movements
-            event_logger.log_info(f"[BUS] Joystick: {data['stick']} (Mag: {data['magnitude']:.2f})")
-            
-    event_bus.subscribe("action_event", log_action_event)
-    event_bus.subscribe("joystick_event", log_joystick_event)
-    
-    # 6. Print Startup Summary
-    event_logger.log_info(f"Active Profile: {active_profile_name}")
-    
-    # 7. Initialize WebSocket Server
-    server = WebSocketServer(
-        state_manager=state_manager, 
-        config_manager=config_manager, 
-        profile_manager=profile_manager,
-        input_buffer=input_buffer,
-        event_logger=event_logger,
-        input_engine=input_engine,
-        input_normalizer=input_normalizer
-    )
-    
-    # 8. Start WebSocket server in background thread running asyncio loop
-    loop = asyncio.new_event_loop()
-    t = threading.Thread(target=run_async_loop, args=(loop,), daemon=True)
-    t.start()
-    
-    # Schedule server starting
-    asyncio.run_coroutine_threadsafe(server.start(), loop)
-    
-    # 8. Start Event Inspector, Movement Simulator and PySide6 Application on main thread
-    event_inspector = EventInspector(event_bus, server)
-    
-    from executor.movement_simulator import MovementSimulator
-    movement_simulator = MovementSimulator(event_bus, profile_manager)
-    
-    app = QApplication(sys.argv)
-    
-    window = DashboardWindow(
-        state_manager=state_manager,
-        profile_manager=profile_manager,
-        config_manager=config_manager,
-        server=server,
-        event_logger=event_logger,
-        event_inspector=event_inspector,
-        movement_simulator=movement_simulator
-    )
-    window.show()
-    
-    # Run the GUI event loop (blocking call)
-    exit_code = app.exec()
-    
-    # 9. Clean up backend on exit
-    event_logger.log_info("Consensius Host stopping backend server...")
-    stop_future = asyncio.run_coroutine_threadsafe(server.stop(), loop)
-    
-    # Wait for server shutdown to finish (max 2 seconds)
-    try:
-        stop_future.result(timeout=2.0)
-    except Exception:
-        pass
-        
-    loop.call_soon_threadsafe(loop.stop())
-    event_logger.stop()
-    sys.exit(exit_code)
+    settings = load_settings()
+
+    # Lazily import heavy modules so errors surface clearly
+    from network.websocket_server import WebSocketServer
+    from input.input_handler import InputHandler
+    from ui.app_window import AppWindow
+
+    # Create server and input handler
+    server        = WebSocketServer(settings)
+    input_handler = InputHandler(settings)
+
+    # Wire input handler into server
+    server.input_handler = input_handler
+
+    # Launch UI (blocks until window is closed)
+    app = AppWindow(server, input_handler, settings)
+    app.mainloop()
+
 
 if __name__ == "__main__":
     main()

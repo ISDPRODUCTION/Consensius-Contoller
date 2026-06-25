@@ -53,4 +53,13 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.okhttp)
     implementation(libs.gson)
+
+    // Camera & QR Code scanning
+    implementation("androidx.camera:camera-camera2:1.3.0")
+    implementation("androidx.camera:camera-lifecycle:1.3.0")
+    implementation("androidx.camera:camera-view:1.3.0")
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+
+    // System UI Controller for immersive mode
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
 }

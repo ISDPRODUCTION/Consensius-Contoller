@@ -1,0 +1,5 @@
+websockets>=12.0
+pynput>=1.7.6
+customtkinter>=5.2.0
+qrcode[pil]>=7.4.2
+Pillow>=10.0.0

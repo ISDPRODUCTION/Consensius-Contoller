@@ -14,6 +14,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 sealed class ConnectionState {
     object Disconnected : ConnectionState()
@@ -31,6 +32,10 @@ class WebSocketManager(private val coroutineScope: CoroutineScope) {
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState
 
+    // Track message sends to detect flooding (for debug logging only)
+    private val lastSendTime = AtomicLong(0L)
+    private var sendCount = 0
+
     private var currentIp: String = ""
     private var currentPort: Int = 0
     private var autoReconnect = true
@@ -44,10 +49,18 @@ class WebSocketManager(private val coroutineScope: CoroutineScope) {
 
         _connectionState.value = ConnectionState.Connecting
 
+        // Shut down any existing client before creating a new one.
+        try { client?.dispatcher?.executorService?.shutdown() } catch (_: Exception) {}
+
         client = OkHttpClient.Builder()
-            .readTimeout(0, TimeUnit.MILLISECONDS)
-            .writeTimeout(0, TimeUnit.MILLISECONDS)
-            .connectTimeout(5000, TimeUnit.MILLISECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)      // no read timeout (streaming)
+            .writeTimeout(10, TimeUnit.SECONDS)         // fail fast on stalled writes
+            .connectTimeout(5, TimeUnit.SECONDS)
+            // ← CRITICAL FIX: send a WebSocket ping every 20 s.
+            // Without this, NAT gateways / firewalls silently drop idle TCP
+            // connections, which OkHttp then reports as
+            // "no close frame received or sent" (EOFException).
+            .pingInterval(20, TimeUnit.SECONDS)
             .build()
 
         val request = Request.Builder()
@@ -102,9 +115,14 @@ class WebSocketManager(private val coroutineScope: CoroutineScope) {
     }
 
     fun send(message: String): Boolean {
-        return if (_connectionState.value is ConnectionState.Connected) {
+        // Guard: only send when connected.
+        if (_connectionState.value !is ConnectionState.Connected) return false
+        return try {
             webSocket?.send(message) ?: false
-        } else {
+        } catch (e: Exception) {
+            // OkHttp can throw if the socket is already closed.
+            // Catch here so the FPS loop / touch handler never crash.
+            Log.e(tag, "WebSocket send error: ${e.message}")
             false
         }
     }

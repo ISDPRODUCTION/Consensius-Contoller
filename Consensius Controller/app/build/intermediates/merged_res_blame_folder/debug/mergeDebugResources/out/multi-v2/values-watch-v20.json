@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.consensius.controller.app-mergeDebugResources-60:/values-watch-v20/values-watch-v20.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\MSI Thin\\.gradle\\caches\\8.9\\transforms\\5587d4829c9b49369cec9bb67f4cb937\\transformed\\appcompat-1.1.0\\res\\values-watch-v20\\values-watch-v20.xml",
+                    "from": {
+                        "startLines": "2,5,8",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,214,385",
+                        "endLines": "4,7,10",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "209,380,553"
+                    }
+                }
+            ]
+        }
+    ]
+}
