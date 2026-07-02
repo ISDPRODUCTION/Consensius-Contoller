@@ -31,17 +31,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="dcac2c44-825b-46f9-9b5d-d1b863623f4b" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/input/input_handler.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/input/input_handler.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/settings.json" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/settings.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/about_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/about_page.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/app_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/app_window.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/connection_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/connection_page.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/monitor_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/monitor_page.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/profiles_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/profiles_page.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/settings_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/settings_page.py" afterDir="false" />
-    </list>
+    <list default="true" id="dcac2c44-825b-46f9-9b5d-d1b863623f4b" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -50,7 +40,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[PhysicalDevice::serial=10DECL0HYH0018N]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[LocalEmulator::path=C:\Users\MSI Thin\.android\avd\Medium_Phone.avd]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />

@@ -350,25 +350,80 @@ File ini dibuat otomatis pada saat pertama kali server dijalankan.
 
 ## 🚀 Instalasi & Cara Menjalankan
 
-### Prasyarat
+> 💡 **Pengguna biasa?** Tidak perlu install Python, Android Studio, atau tools apapun!
+> Cukup download file di bawah ini dan langsung pakai.
+
+---
+
+### ⬇️ Download
+
+**👉 [Klik di sini untuk download — GitHub Releases](https://github.com/ISDPRODUCTION/Consensius-Contoller/releases/latest)**
+
+| File | Untuk | Ukuran |
+|---|---|---|
+| `ConsenciusServer-v1.0.0.exe` | 🖥️ PC / Laptop Windows | ~58 MB |
+| `Consensius-Controller-v1.0.0.apk` | 📱 HP Android | ~31 MB |
+
+---
+
+### 🖥️ Cara Install di PC (Windows)
+
+1. Download file **`ConsenciusServer-v1.0.0.exe`**
+2. Simpan di folder mana saja (misal: Desktop)
+3. **Klik dua kali** untuk membuka — tidak perlu install apapun
+4. Jika muncul peringatan *"Windows protected your PC"*, klik **"More info"** → **"Run anyway"**
+   > ⚠️ Peringatan ini muncul karena aplikasi belum memiliki sertifikat resmi, bukan karena berbahaya.
+5. Klik tombol **▶ Start Server** di aplikasi
+
+---
+
+### 📱 Cara Install di HP Android
+
+1. Download file **`Consensius-Controller-v1.0.0.apk`** langsung dari HP kamu
+2. Buka file APK yang sudah didownload
+3. Jika muncul peringatan **"Install from unknown sources"**:
+   - Tap **"Settings"** → aktifkan **"Allow from this source"**
+   - Kembali dan tap **"Install"**
+4. Setelah terpasang, buka aplikasi **Consensius Controller**
+
+> 📌 **Persyaratan:** Android minimal versi **8.0 (Oreo)** ke atas.
+
+---
+
+### 🔗 Cara Menghubungkan HP ke PC
+
+1. Pastikan **PC dan HP terhubung ke Wi-Fi yang sama** (jaringan rumah/hotspot yang sama)
+2. Buka **Consensius Server** di PC → klik **▶ Start Server**
+3. Server akan menampilkan **QR Code** di layar
+4. Buka aplikasi **Consensius Controller** di HP
+5. Tap tombol **Scan QR** → arahkan kamera ke QR Code di layar PC
+6. Koneksi terbuat otomatis ✅ — langsung siap main!
+
+> **Alternatif tanpa QR:** Masukkan IP PC secara manual di aplikasi Android.
+> IP bisa dilihat di aplikasi server (contoh: `192.168.1.5`).
+
+---
+
+### 👨‍💻 Setup untuk Developer (Build dari Source)
+
+<details>
+<summary>Klik untuk expand — panduan build manual</summary>
+
+#### Prasyarat
 
 | Komponen | Versi Minimum |
 |---|---|
 | Python | 3.11+ |
-| pip | terbaru |
-| Android | API 26 (Android 8.0+) |
 | Android Studio | Ladybug / terbaru |
 | JDK | 17+ |
 | Koneksi Jaringan | PC dan Android di Wi-Fi yang sama |
 
----
-
-### 🖥️ Setup Server (PC)
+#### 🖥️ Setup Server (PC)
 
 **1. Clone repository**
 ```bash
-git clone https://github.com/username/consensius-controller.git
-cd consensius-controller/consensius-server
+git clone https://github.com/ISDPRODUCTION/Consensius-Contoller.git
+cd Consensius-Contoller/consensius-server
 ```
 
 **2. (Opsional) Buat virtual environment**
@@ -387,15 +442,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Dependensi yang diinstall:
-```
-websockets>=12.0
-pynput>=1.7.6
-customtkinter>=5.2.0
-qrcode[pil]>=7.4.2
-Pillow>=10.0.0
-```
-
 **4. Jalankan server**
 ```bash
 python main.py
@@ -403,34 +449,22 @@ python main.py
 
 > **Catatan Windows:** Jika mouse/keyboard tidak merespons, coba jalankan sebagai **Administrator**.
 
----
+#### 📱 Build APK Android
 
-### 📱 Setup Aplikasi Android
+**Metode 1: Android Studio**
+1. Buka **Android Studio** → **Open** → pilih folder `Consensius Controller/`
+2. Tunggu **Gradle Sync** selesai
+3. Hubungkan HP via USB (aktifkan Developer Mode + USB Debugging)
+4. Klik **Run ▶**
 
-**Metode 1: Android Studio (Recommended)**
-
-1. Buka **Android Studio**
-2. Pilih **Open** → pilih folder `Consensius Controller/`
-3. Tunggu proses **Gradle Sync** selesai
-4. Hubungkan device Android via USB (aktifkan Developer Mode + USB Debugging)
-5. Klik tombol **Run ▶**
-
-**Metode 2: Build APK Manual**
+**Metode 2: Command Line**
 ```bash
 cd "Consensius Controller"
-
-# Windows
 gradlew.bat assembleDebug
-
-# Linux / macOS
-./gradlew assembleDebug
-```
-APK tersedia di: `app/build/outputs/apk/debug/app-debug.apk`
-
-Lalu install ke device:
-```bash
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
+
+</details>
 
 ---
 
