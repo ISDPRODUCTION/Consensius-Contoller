@@ -542,6 +542,6 @@ Proyek ini dilisensikan di bawah **MIT License** — bebas digunakan, dimodifika
 
 <div align="center">
 
-Dibuat dengan ❤️ oleh tim **Consensius**
+Dibuat oleh tim **ISD.PRODUCTION**
 
 </div>
