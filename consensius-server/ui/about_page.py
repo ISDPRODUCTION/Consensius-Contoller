@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 ui/about_page.py
 ================

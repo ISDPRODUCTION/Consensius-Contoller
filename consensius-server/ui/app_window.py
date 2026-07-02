@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 ui/app_window.py
 ================
@@ -26,11 +27,11 @@ SUCCESS   = "#00E676"
 ERROR     = "#FF1744"
 
 NAV_ITEMS = [
-    ("connection", "⚡  Connection"),
-    ("profiles",   "🎮  Profiles"),
-    ("monitor",    "📊  Monitor"),
-    ("settings",   "⚙  Settings"),
-    ("about",      "ℹ  About"),
+    ("connection", "Connection"),
+    ("profiles",   "Profiles"),
+    ("monitor",    "Monitor"),
+    ("settings",   "Settings"),
+    ("about",      "About"),
 ]
 
 
@@ -108,7 +109,7 @@ class AppWindow(ctk.CTk):
 
         # Status chip at bottom of sidebar
         self._status_chip = ctk.CTkLabel(
-            sidebar, text="● STOPPED",
+            sidebar, text="[STOPPED]",
             font=("Consolas", 10, "bold"), text_color=ERROR
         )
         self._status_chip.grid(row=len(NAV_ITEMS) + 2, column=0,
@@ -185,9 +186,9 @@ class AppWindow(ctk.CTk):
         conn_page.set_running(running)
         conn_page.set_device_count(self._server.connected_count)
         if running:
-            self._status_chip.configure(text="● RUNNING", text_color=SUCCESS)
+            self._status_chip.configure(text="[RUNNING]", text_color=SUCCESS)
         else:
-            self._status_chip.configure(text="● STOPPED", text_color=ERROR)
+            self._status_chip.configure(text="[STOPPED]", text_color=ERROR)
 
     # ── Server callbacks (called from background thread → schedule on main) ────
 

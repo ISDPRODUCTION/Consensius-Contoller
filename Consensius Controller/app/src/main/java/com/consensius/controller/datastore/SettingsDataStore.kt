@@ -9,18 +9,15 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.consensius.controller.model.ButtonConfig
 import com.consensius.controller.model.ButtonElementConfig
 import com.consensius.controller.model.CanvasElement
 import com.consensius.controller.model.ControllerProfile
 import com.consensius.controller.model.DpadElementConfig
-import com.consensius.controller.model.DpadMapping
-import com.consensius.controller.model.ElementSize
+import com.consensius.controller.model.ElementDefaults
 import com.consensius.controller.model.ElementType
 import com.consensius.controller.model.JoystickElementConfig
 import com.consensius.controller.model.JoystickType
 import com.consensius.controller.model.ProfilePage
-import com.consensius.controller.model.RightJoystickMode
 import com.consensius.controller.model.TouchpadElementConfig
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
@@ -184,28 +181,36 @@ class SettingsDataStore(private val context: Context) {
                     name = "Page 1",
                     elements = listOf(
                         CanvasElement(id = "ml-dpad", type = ElementType.DPAD, label = "DPAD",
-                            x = 0.18f, y = 0.55f, size = ElementSize.L,
+                            x = 0.18f, y = 0.55f,
+                            width = ElementDefaults.DPAD_WIDTH, height = ElementDefaults.DPAD_HEIGHT,
                             dpadConfig = DpadElementConfig("w","s","a","d")),
                         CanvasElement(id = "ml-js-left", type = ElementType.JOYSTICK, label = "Move",
-                            x = 0.10f, y = 0.75f, size = ElementSize.L,
+                            x = 0.10f, y = 0.75f,
+                            width = ElementDefaults.JOYSTICK_SIZE, height = ElementDefaults.JOYSTICK_SIZE,
                             joystickConfig = JoystickElementConfig(JoystickType.MOVEMENT)),
                         CanvasElement(id = "ml-js-right", type = ElementType.JOYSTICK, label = "Aim",
-                            x = 0.65f, y = 0.75f, size = ElementSize.M,
+                            x = 0.65f, y = 0.75f,
+                            width = 120f, height = 120f,
                             joystickConfig = JoystickElementConfig(JoystickType.SKILL_AIM, "")),
                         CanvasElement(id = "ml-s1", type = ElementType.BUTTON, label = "S1",
-                            x = 0.72f, y = 0.35f, size = ElementSize.M,
+                            x = 0.72f, y = 0.35f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("k")),
                         CanvasElement(id = "ml-s2", type = ElementType.BUTTON, label = "S2",
-                            x = 0.80f, y = 0.55f, size = ElementSize.M,
+                            x = 0.80f, y = 0.55f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("j")),
                         CanvasElement(id = "ml-s3", type = ElementType.BUTTON, label = "S3",
-                            x = 0.88f, y = 0.35f, size = ElementSize.M,
+                            x = 0.88f, y = 0.35f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("u")),
                         CanvasElement(id = "ml-atk", type = ElementType.BUTTON, label = "ATK",
-                            x = 0.80f, y = 0.75f, size = ElementSize.L,
+                            x = 0.80f, y = 0.75f,
+                            width = 100f, height = 100f,
                             buttonConfig = ButtonElementConfig("f")),
                         CanvasElement(id = "ml-spl", type = ElementType.BUTTON, label = "SPL",
-                            x = 0.65f, y = 0.65f, size = ElementSize.S,
+                            x = 0.65f, y = 0.65f,
+                            width = 65f, height = 65f,
                             buttonConfig = ButtonElementConfig("e")),
                     )
                 )
@@ -220,28 +225,36 @@ class SettingsDataStore(private val context: Context) {
                     name = "Page 1",
                     elements = listOf(
                         CanvasElement(id = "pubg-dpad", type = ElementType.DPAD, label = "DPAD",
-                            x = 0.18f, y = 0.55f, size = ElementSize.L,
+                            x = 0.18f, y = 0.55f,
+                            width = ElementDefaults.DPAD_WIDTH, height = ElementDefaults.DPAD_HEIGHT,
                             dpadConfig = DpadElementConfig("w","s","a","d")),
                         CanvasElement(id = "pubg-js-left", type = ElementType.JOYSTICK, label = "Move",
-                            x = 0.10f, y = 0.75f, size = ElementSize.L,
+                            x = 0.10f, y = 0.75f,
+                            width = ElementDefaults.JOYSTICK_SIZE, height = ElementDefaults.JOYSTICK_SIZE,
                             joystickConfig = JoystickElementConfig(JoystickType.MOVEMENT)),
                         CanvasElement(id = "pubg-tp", type = ElementType.TOUCHPAD, label = "TP",
-                            x = 0.50f, y = 0.50f, size = ElementSize.L,
+                            x = 0.50f, y = 0.50f,
+                            width = ElementDefaults.TOUCHPAD_WIDTH, height = ElementDefaults.TOUCHPAD_HEIGHT,
                             touchpadConfig = TouchpadElementConfig(1.5f, "mouse1", "mouse2")),
                         CanvasElement(id = "pubg-fire", type = ElementType.BUTTON, label = "FIRE",
-                            x = 0.82f, y = 0.60f, size = ElementSize.L,
+                            x = 0.82f, y = 0.60f,
+                            width = 100f, height = 100f,
                             buttonConfig = ButtonElementConfig("f")),
                         CanvasElement(id = "pubg-ads", type = ElementType.BUTTON, label = "ADS",
-                            x = 0.72f, y = 0.40f, size = ElementSize.M,
+                            x = 0.72f, y = 0.40f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("mouse2")),
                         CanvasElement(id = "pubg-reload", type = ElementType.BUTTON, label = "RLD",
-                            x = 0.65f, y = 0.25f, size = ElementSize.M,
+                            x = 0.65f, y = 0.25f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("r")),
                         CanvasElement(id = "pubg-jump", type = ElementType.BUTTON, label = "JUMP",
-                            x = 0.88f, y = 0.30f, size = ElementSize.M,
+                            x = 0.88f, y = 0.30f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("space")),
                         CanvasElement(id = "pubg-crouch", type = ElementType.BUTTON, label = "CRCH",
-                            x = 0.88f, y = 0.75f, size = ElementSize.M,
+                            x = 0.88f, y = 0.75f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
                             buttonConfig = ButtonElementConfig("c")),
                     )
                 )

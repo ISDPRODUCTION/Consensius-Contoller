@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 ui/profiles_page.py
 ===================
@@ -69,7 +70,7 @@ class ProfilesPage(ctk.CTkFrame):
         frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(0, weight=1)
-        ctk.CTkLabel(frame, text="ðŸ“±  No profile received yet",
+        ctk.CTkLabel(frame, text="No profile received yet",
                      font=("Consolas", 14), text_color=TEXT2).grid(
                          row=0, column=0, pady=40)
         ctk.CTkLabel(frame,
@@ -84,7 +85,7 @@ class ProfilesPage(ctk.CTkFrame):
 
         p = self._profile
         name     = p.get("name", "Unknown")
-        rj_mode  = p.get("rightJoystickMode", "â€”")
+        rj_mode  = p.get("rightJoystickMode", "-")
         dpad     = p.get("dpadMapping", {})
         buttons  = p.get("buttons", [])
 
@@ -108,8 +109,8 @@ class ProfilesPage(ctk.CTkFrame):
 
         # D-Pad card
         dpad_card = self._section_card(scroll, row=1, col=0, title="D-PAD MAPPING")
-        dirs = [("â†‘ Up", dpad.get("up", "â€”")), ("â†“ Down", dpad.get("down", "â€”")),
-                ("â† Left", dpad.get("left", "â€”")), ("â†’ Right", dpad.get("right", "â€”"))]
+        dirs = [("Up",    dpad.get("up", "-")),   ("Down",  dpad.get("down", "-")),
+                ("Left",  dpad.get("left", "-")), ("Right", dpad.get("right", "-"))]
         for i, (label, key) in enumerate(dirs):
             self._key_row(dpad_card, i + 1, label, key, "#00C2FF")
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 ui/settings_page.py
 ===================
@@ -105,10 +106,10 @@ class SettingsPage(ctk.CTkFrame):
                                self._jt_var, 0.1, 0.5, "")
 
         # Skill aim distance
-        sad_val = self._settings.get("skill_aim_distance", 80)
+        sad_val = self._settings.get("skill_aim_distance", 300)
         self._sad_var = ctk.DoubleVar(value=float(sad_val))
-        row = self._slider_row(content, row, "Skill Aim Distance (px)",
-                               self._sad_var, 20, 250, " px")
+        row = self._slider_row(content, row, "Skill Aim Range (px)",
+                               self._sad_var, 50, 800, " px")
 
         # ── Skill Aim Positions section ───────────────────────────────────────
         self._section(content, row, "SKILL AIM POSITIONS"); row += 1
@@ -119,7 +120,7 @@ class SettingsPage(ctk.CTkFrame):
         ctk.CTkLabel(
             hint_frame,
             text=(
-                "💡  Click [CAPTURE] → server waits 3 s → move mouse to the skill\n"
+                "[!] Click [CAPTURE] -> server waits 3 s -> move mouse to the skill\n"
                 "    button on your game screen and hold still. Position is recorded."
             ),
             font=("Consolas", 10), text_color=TEXT2, justify="left", anchor="w"
@@ -144,8 +145,8 @@ class SettingsPage(ctk.CTkFrame):
             x_val = pos.get("x", -1) if isinstance(pos, dict) else -1
             y_val = pos.get("y", -1) if isinstance(pos, dict) else -1
 
-            x_var = ctk.StringVar(value=str(int(x_val)) if x_val >= 0 else "—")
-            y_var = ctk.StringVar(value=str(int(y_val)) if y_val >= 0 else "—")
+            x_var = ctk.StringVar(value=str(int(x_val)) if x_val >= 0 else "-")
+            y_var = ctk.StringVar(value=str(int(y_val)) if y_val >= 0 else "-")
             self._pos_vars[key] = {"x": x_var, "y": y_var}
 
             row = self._skill_pos_row(content, row, key, x_var, y_var)
@@ -158,7 +159,7 @@ class SettingsPage(ctk.CTkFrame):
                      placeholder_text="key (e.g. e)", width=70,
                      font=("Consolas", 12), fg_color="#1A2535",
                      border_color=BORDER, text_color=TEXT).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(add_frame, text="＋ Add Key", width=100,
+        ctk.CTkButton(add_frame, text="+ Add Key", width=100,
                       font=("Consolas", 11), fg_color="#132030",
                       hover_color="#1A3040", border_width=1,
                       border_color=BORDER, text_color=TEXT2,
@@ -209,7 +210,7 @@ class SettingsPage(ctk.CTkFrame):
 
         # Capture button
         cap_btn = ctk.CTkButton(
-            frame, text="📍 CAPTURE", width=100,
+            frame, text="CAPTURE", width=100,
             font=("Consolas", 11, "bold"),
             fg_color="#132030", hover_color="#1A3040",
             border_width=1, border_color=ACCENT,
@@ -221,7 +222,7 @@ class SettingsPage(ctk.CTkFrame):
 
         # Clear button
         ctk.CTkButton(
-            frame, text="✕", width=28,
+            frame, text="X", width=28,
             font=("Consolas", 11),
             fg_color="transparent", hover_color="#2A0A0A",
             border_width=1, border_color="#3A1515",
@@ -242,7 +243,7 @@ class SettingsPage(ctk.CTkFrame):
 
         def _countdown():
             for i in range(3, 0, -1):
-                self.after(0, status_var.set, f"⏳ {i}s...")
+                self.after(0, status_var.set, f"Wait {i}s...")
                 time.sleep(1)
             # Read current mouse position
             try:
@@ -252,7 +253,7 @@ class SettingsPage(ctk.CTkFrame):
             self.after(0, self._apply_capture, key, x_var, y_var, status_var, px, py)
 
         threading.Thread(target=_countdown, daemon=True).start()
-        status_var.set("⏳ 3s...")
+        status_var.set("Wait 3s...")
 
     def _apply_capture(self, key: str, x_var: ctk.StringVar,
                        y_var: ctk.StringVar, status_var: ctk.StringVar,
@@ -260,16 +261,16 @@ class SettingsPage(ctk.CTkFrame):
         if px >= 0 and py >= 0:
             x_var.set(str(px))
             y_var.set(str(py))
-            status_var.set("✔ captured")
-            print(f"[SKILL_POS] Captured key={key!r} → ({px}, {py})")
+            status_var.set("[OK] captured")
+            print(f"[SKILL_POS] Captured key={key!r} -> ({px}, {py})")
         else:
-            status_var.set("⚠ failed")
+            status_var.set("[WARN] failed")
         # Clear status after 3 s
         self.after(3000, status_var.set, "")
 
     def _clear_pos(self, key: str, x_var: ctk.StringVar, y_var: ctk.StringVar):
-        x_var.set("—")
-        y_var.set("—")
+        x_var.set("-")
+        y_var.set("-")
 
     # ── Add custom key ─────────────────────────────────────────────────────────
 
@@ -277,12 +278,12 @@ class SettingsPage(ctk.CTkFrame):
         key = self._new_key_var.get().strip().lower()
         if not key or key in self._pos_vars:
             return
-        x_var = ctk.StringVar(value="—")
-        y_var  = ctk.StringVar(value="—")
+        x_var = ctk.StringVar(value="-")
+        y_var  = ctk.StringVar(value="-")
         self._pos_vars[key] = {"x": x_var, "y": y_var}
         self._new_key_var.set("")
-        # Need to rebuild to show new row — simplest approach: trigger save then rebuild
-        self._save_status.configure(text=f"Key '{key}' added — save to persist.", text_color=WARN)
+        # Need to rebuild to show new row -- simplest approach: trigger save then rebuild
+        self._save_status.configure(text=f"Key '{key}' added - save to persist.", text_color=WARN)
         self.after(3000, lambda: self._save_status.configure(text=""))
 
     # ── Helpers ────────────────────────────────────────────────────────────────
@@ -329,7 +330,7 @@ class SettingsPage(ctk.CTkFrame):
             if not (1 <= port <= 65535):
                 raise ValueError
         except ValueError:
-            self._save_status.configure(text="⚠   Invalid port number", text_color=ERROR)
+            self._save_status.configure(text="[!] Invalid port number", text_color=ERROR)
             return
 
         # Build skill_positions dict from StringVars
@@ -357,7 +358,7 @@ class SettingsPage(ctk.CTkFrame):
                 json.dump(new_settings, f, indent=2)
             self._settings = new_settings
             self._on_save(new_settings)
-            self._save_status.configure(text="✔  Settings saved!", text_color=SUCCESS)
+            self._save_status.configure(text="[OK] Settings saved!", text_color=SUCCESS)
             self.after(3000, lambda: self._save_status.configure(text=""))
         except Exception as e:
-            self._save_status.configure(text=f"⚠   Error: {e}", text_color=ERROR)
+            self._save_status.configure(text=f"[!] Error: {e}", text_color=ERROR)

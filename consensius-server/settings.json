@@ -5,7 +5,7 @@
   "joystick_threshold": 0.3,
   "invert_x": false,
   "invert_y": true,
-  "skill_aim_distance": 25,
+  "skill_aim_distance": 800,
   "skill_positions": {
     "j": {"x": -1, "y": -1},
     "k": {"x": -1, "y": -1},

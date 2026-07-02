@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 ui/connection_page.py
 =====================
@@ -64,7 +65,7 @@ class ConnectionPage(ctk.CTkFrame):
 
         # Toggle button
         self._toggle_btn = ctk.CTkButton(
-            left, text="â–¶  START SERVER",
+            left, text="START SERVER",
             font=("Consolas", 13, "bold"),
             fg_color=ACCENT, hover_color="#0066CC",
             corner_radius=8, height=42,
@@ -84,10 +85,10 @@ class ConnectionPage(ctk.CTkFrame):
         self._port_val = self._info_row(self._info_frame, 1, "Port",
                                         str(self._server.port))
         self._dev_val  = self._info_row(self._info_frame, 2, "Devices", "0")
-        self._cip_val  = self._info_row(self._info_frame, 3, "Client IP", "â€”")
-        self._prof_val = self._info_row(self._info_frame, 4, "Profile", "â€”")
+        self._cip_val  = self._info_row(self._info_frame, 3, "Client IP", "-")
+        self._prof_val = self._info_row(self._info_frame, 4, "Profile", "-")
 
-        # â”€â”€ RIGHT: QR Code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ---- RIGHT: QR Code --------------------------------------------------
         right = ctk.CTkFrame(self, fg_color=CARD, corner_radius=12,
                              border_width=1, border_color=BORDER)
         right.grid(row=0, column=1, sticky="nsew", padx=(8, 16), pady=16)
@@ -100,7 +101,7 @@ class ConnectionPage(ctk.CTkFrame):
         self._qr_label.grid(row=1, column=0, pady=4)
 
         ctk.CTkButton(
-            right, text="â†»  Regenerate",
+            right, text="Regenerate",
             font=("Consolas", 11), fg_color="#1A2535",
             hover_color="#223044", corner_radius=6, height=32,
             command=self._refresh_qr
@@ -127,7 +128,7 @@ class ConnectionPage(ctk.CTkFrame):
         val_lbl.grid(row=row, column=1, sticky="e", pady=3)
         return val_lbl
 
-    # â”€â”€ QR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ---- QR ------------------------------------------------------------------
 
     def _refresh_qr(self):
         img = generate_qr_image(self._local_ip, self._server.port, size=190)
@@ -139,7 +140,7 @@ class ConnectionPage(ctk.CTkFrame):
         uri = f"consensius://{self._local_ip}:{self._server.port}"
         self._uri_label.configure(text=uri)
 
-    # â”€â”€ Server toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ---- Server toggle -------------------------------------------------------
 
     def _toggle_server(self):
         if self._server.is_running:
@@ -147,25 +148,24 @@ class ConnectionPage(ctk.CTkFrame):
         else:
             self._on_start()
 
-    # â”€â”€ Update helpers (called from main thread via after()) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ---- Update helpers (called from main thread via after()) ----------------
 
     def set_running(self, running: bool):
         if running:
             self._dot_canvas.itemconfig(self._dot, fill=SUCCESS)
             self._status_label.configure(text="SERVER RUNNING", text_color=SUCCESS)
-            self._toggle_btn.configure(text="â–   STOP SERVER", fg_color=ERROR,
+            self._toggle_btn.configure(text="STOP SERVER", fg_color=ERROR,
                                        hover_color="#CC1133")
         else:
             self._dot_canvas.itemconfig(self._dot, fill=ERROR)
             self._status_label.configure(text="SERVER STOPPED", text_color=ERROR)
-            self._toggle_btn.configure(text="â–¶  START SERVER", fg_color=ACCENT,
+            self._toggle_btn.configure(text="START SERVER", fg_color=ACCENT,
                                        hover_color="#0066CC")
         self._port_val.configure(text=str(self._server.port))
 
     def set_client(self, ip: Optional[str], profile_name: Optional[str]):
-        self._cip_val.configure(text=ip or "â€”")
-        self._prof_val.configure(text=profile_name or "â€”")
+        self._cip_val.configure(text=ip or "-")
+        self._prof_val.configure(text=profile_name or "-")
 
     def set_device_count(self, n: int):
         self._dev_val.configure(text=str(n))
-

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 main.py
 =======
@@ -8,8 +9,15 @@ Consensius Server entry point.
 - WebSocket runs in a background daemon thread
 """
 import json
-import sys  
+import sys
+import io
 from pathlib import Path
+
+# Fix Windows console encoding so print() never raises UnicodeEncodeError
+if hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'buffer'):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 BASE_DIR = Path(__file__).resolve().parent
 SETTINGS_FILE = BASE_DIR / "settings.json"

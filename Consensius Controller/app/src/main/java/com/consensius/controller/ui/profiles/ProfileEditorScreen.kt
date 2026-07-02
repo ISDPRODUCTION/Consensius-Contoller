@@ -48,6 +48,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -55,6 +58,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -84,13 +88,12 @@ import com.consensius.controller.model.ButtonElementConfig
 import com.consensius.controller.model.CanvasElement
 import com.consensius.controller.model.ControllerProfile
 import com.consensius.controller.model.DpadElementConfig
-import com.consensius.controller.model.ElementSize
+import com.consensius.controller.model.ElementDefaults
 import com.consensius.controller.model.ElementType
 import com.consensius.controller.model.JoystickElementConfig
 import com.consensius.controller.model.JoystickType
 import com.consensius.controller.model.ProfilePage
 import com.consensius.controller.model.TouchpadElementConfig
-import com.consensius.controller.model.toDp
 import com.consensius.controller.ui.theme.ConsensiusColors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -104,9 +107,10 @@ fun ProfileEditorScreen(
     settingsDataStore: SettingsDataStore,
     onNavigateBack: () -> Unit
 ) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val density = LocalDensity.current
+    val context           = LocalContext.current
+    val coroutineScope    = rememberCoroutineScope()
+    val density           = LocalDensity.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Force landscape orientation
     DisposableEffect(Unit) {
@@ -121,17 +125,19 @@ fun ProfileEditorScreen(
     val isNew = profileId == "new" || profileId.isNullOrBlank()
 
     // ── Profile state ─────────────────────────────────────────────────────────
-    var profileName by remember { mutableStateOf(if (isNew) "" else "Loading…") }
+    var profileName by remember { mutableStateOf(if (isNew) "New Profile" else "Loading…") }
     var editingId   by remember { mutableStateOf(if (isNew) UUID.randomUUID().toString() else profileId ?: UUID.randomUUID().toString()) }
     val pages       = remember { mutableStateListOf<ProfilePage>() }
     var currentPage by remember { mutableIntStateOf(0) }
 
     // ── UI state ──────────────────────────────────────────────────────────────
-    var menuExpanded        by remember { mutableStateOf(false) }
-    var fabExpanded         by remember { mutableStateOf(false) }
-    var settingsElement     by remember { mutableStateOf<CanvasElement?>(null) }
-    var showSaveAsDialog    by remember { mutableStateOf(false) }
-    var saveAsName          by remember { mutableStateOf("") }
+    // Top-right 3-dot menu (replaces the full top bar)
+    var menuExpanded      by remember { mutableStateOf(false) }
+    var showNameDialog    by remember { mutableStateOf(false) }
+    var fabExpanded       by remember { mutableStateOf(false) }
+    var settingsElement   by remember { mutableStateOf<CanvasElement?>(null) }
+    var showSaveAsDialog  by remember { mutableStateOf(false) }
+    var saveAsName        by remember { mutableStateOf("") }
 
     // Canvas size in px
     var canvasWidthPx  by remember { mutableFloatStateOf(1f) }
@@ -150,9 +156,7 @@ fun ProfileEditorScreen(
                 })
             }
         }
-        if (pages.isEmpty()) {
-            pages.add(ProfilePage(name = "Page 1"))
-        }
+        if (pages.isEmpty()) pages.add(ProfilePage(name = "Page 1"))
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -171,29 +175,24 @@ fun ProfileEditorScreen(
     fun addElement(el: CanvasElement) {
         val pageIdx = currentPage
         if (pageIdx < 0 || pageIdx >= pages.size) return
-        val newElems = pages[pageIdx].elements + el
-        pages[pageIdx] = pages[pageIdx].copy(elements = newElems)
+        pages[pageIdx] = pages[pageIdx].copy(elements = pages[pageIdx].elements + el)
     }
 
     fun deleteElement(id: String) {
         val pageIdx = currentPage
         if (pageIdx < 0 || pageIdx >= pages.size) return
-        val newElems = pages[pageIdx].elements.filter { it.id != id }
-        pages[pageIdx] = pages[pageIdx].copy(elements = newElems)
+        pages[pageIdx] = pages[pageIdx].copy(elements = pages[pageIdx].elements.filter { it.id != id })
     }
 
     fun saveProfile(name: String, newId: String = editingId) {
         coroutineScope.launch {
-            val profile = ControllerProfile(
-                id    = newId,
-                name  = name.ifBlank { "Untitled" },
-                pages = pages.toList()
+            settingsDataStore.saveProfile(
+                ControllerProfile(id = newId, name = name.ifBlank { "Untitled" }, pages = pages.toList())
             )
-            settingsDataStore.saveProfile(profile)
+            snackbarHostState.showSnackbar(message = "Profile saved!", duration = SnackbarDuration.Short)
         }
     }
 
-    // ── Bottom sheet state ────────────────────────────────────────────────────
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -203,7 +202,7 @@ fun ProfileEditorScreen(
             .background(ConsensiusColors.Background)
     ) {
 
-        // ── Dot-grid canvas ───────────────────────────────────────────────────
+        // ── Dot-grid canvas (full-screen, no top bar blocking) ─────────────────
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -212,151 +211,107 @@ fun ProfileEditorScreen(
                     canvasHeightPx = coords.size.height.toFloat()
                 }
         ) {
-            // Dot grid background
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val spacing = 28.dp.toPx()
-                val dotR    = 1.5f
+                val spacing  = 28.dp.toPx()
                 val dotColor = Color(0xFF00C2FF).copy(alpha = 0.12f)
                 var x = spacing
                 while (x < size.width) {
                     var y = spacing
                     while (y < size.height) {
-                        drawCircle(dotColor, dotR, Offset(x, y))
+                        drawCircle(dotColor, 1.5f, Offset(x, y))
                         y += spacing
                     }
                     x += spacing
                 }
             }
 
-            // Render elements on current page
+            // ── Element rendering ─────────────────────────────────────────────
+            // Each element is wrapped in key(el.id) so Compose tracks state
+            // correctly even when elements are added/removed/reordered.
             currentElements().forEach { el ->
-                val sizeDp = el.size.toDp().dp
-                val sizePx = with(density) { sizeDp.toPx() }
-                val initX  = (el.x * canvasWidthPx  - sizePx / 2).coerceAtLeast(0f)
-                val initY  = (el.y * canvasHeightPx - sizePx / 2).coerceAtLeast(0f)
+                key(el.id) {
+                    // Per-element size — never shared
+                    val widthDp       = el.width.dp
+                    val heightDp      = el.height.dp
+                    val widthPx       = with(density) { widthDp.toPx() }
+                    val heightPx      = with(density) { heightDp.toPx() }
+                    val visualWidthPx = if (el.type == ElementType.TOUCHPAD) widthPx * 2.5f else widthPx
 
-                var offsetX by remember(el.id) { mutableFloatStateOf(initX) }
-                var offsetY by remember(el.id) { mutableFloatStateOf(initY) }
+                    // Local drag offset — initialised from stored fraction position
+                    var offsetX by remember { mutableFloatStateOf((el.x * canvasWidthPx - visualWidthPx / 2).coerceAtLeast(0f)) }
+                    var offsetY by remember { mutableFloatStateOf((el.y * canvasHeightPx - heightPx / 2).coerceAtLeast(0f)) }
 
-                // Sync position when canvasSize changes
-                LaunchedEffect(canvasWidthPx, canvasHeightPx, el.id) {
-                    offsetX = (el.x * canvasWidthPx  - sizePx / 2).coerceAtLeast(0f)
-                    offsetY = (el.y * canvasHeightPx - sizePx / 2).coerceAtLeast(0f)
-                }
+                    // Re-sync ONLY when canvas size changes (e.g. rotation).
+                    // NOT keyed on el.x/el.y — that would cause the LaunchedEffect to
+                    // fight with the drag handler on every frame, making drag heavy.
+                    // NOT keyed on el.width/el.height — slider would snap position.
+                    LaunchedEffect(canvasWidthPx, canvasHeightPx) {
+                        offsetX = ((el.x * canvasWidthPx) - visualWidthPx / 2).coerceAtLeast(0f)
+                        offsetY = ((el.y * canvasHeightPx) - heightPx / 2).coerceAtLeast(0f)
+                    }
 
-                Box(
-                    modifier = Modifier
-                        .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                        .then(
-                            if (el.type == ElementType.TOUCHPAD)
-                                Modifier
-                                    .width((sizeDp * 2.5f))
-                                    .height(sizeDp)
-                            else
-                                Modifier.size(sizeDp)
-                        )
-                        .pointerInput(el.id + "_drag") {
-                            detectDragGestures { _, delta ->
-                                val w = if (el.type == ElementType.TOUCHPAD) sizePx * 2.5f else sizePx
-                                val newX = (offsetX + delta.x).coerceIn(0f, canvasWidthPx - w)
-                                val newY = (offsetY + delta.y).coerceIn(0f, canvasHeightPx - sizePx)
-                                offsetX = newX
-                                offsetY = newY
-                                updateElement(
-                                    el.copy(
-                                        x = (newX + w / 2) / canvasWidthPx,
-                                        y = (newY + sizePx / 2) / canvasHeightPx
-                                    )
-                                )
+                    Box(
+                        modifier = Modifier
+                            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                            .then(
+                                if (el.type == ElementType.TOUCHPAD)
+                                    Modifier.width(widthDp * 2.5f).height(heightDp)
+                                else
+                                    Modifier.width(widthDp).height(heightDp)
+                            )
+                            // FIX DRAG PERFORMANCE: update model only on drag END, not every frame.
+                            // FIX DRAG FLIES: pointerInput key includes el.width + el.height so the
+                            //   lambda always captures the CURRENT visualWidthPx / heightPx after a
+                            //   slider resize — prevents stale-closure position mismatch.
+                            .pointerInput(el.id, el.width, el.height) {
+                                detectDragGestures(
+                                    onDragEnd = {
+                                        // Write final position to model once, after drag finishes.
+                                        val liveEl = pages.getOrNull(currentPage)
+                                            ?.elements?.firstOrNull { e -> e.id == el.id }
+                                            ?: return@detectDragGestures
+                                        updateElement(
+                                            liveEl.copy(
+                                                x = ((offsetX + visualWidthPx / 2) / canvasWidthPx).coerceIn(0f, 1f),
+                                                y = ((offsetY + heightPx / 2) / canvasHeightPx).coerceIn(0f, 1f)
+                                            )
+                                        )
+                                    },
+                                    onDragCancel = {
+                                        // Snap back to last saved position on gesture cancel
+                                        val liveEl = pages.getOrNull(currentPage)
+                                            ?.elements?.firstOrNull { e -> e.id == el.id }
+                                        if (liveEl != null) {
+                                            offsetX = ((liveEl.x * canvasWidthPx) - visualWidthPx / 2).coerceAtLeast(0f)
+                                            offsetY = ((liveEl.y * canvasHeightPx) - heightPx / 2).coerceAtLeast(0f)
+                                        }
+                                    }
+                                ) { _, delta ->
+                                    // Only update local state — ZERO model writes here.
+                                    // This makes dragging buttery smooth (no recomposition per frame).
+                                    offsetX = (offsetX + delta.x).coerceIn(0f, (canvasWidthPx - visualWidthPx).coerceAtLeast(0f))
+                                    offsetY = (offsetY + delta.y).coerceIn(0f, (canvasHeightPx - heightPx).coerceAtLeast(0f))
+                                }
                             }
-                        }
-                ) {
-                    CanvasElementWidget(
-                        element = el,
-                        onSettingsTap = { settingsElement = el }
-                    )
+                    ) {
+                        CanvasElementWidget(
+                            element       = el,
+                            onSettingsTap = { settingsElement = el }
+                        )
+                    }
                 }
             }
         }
 
-        // ── TOP BAR ───────────────────────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(ConsensiusColors.Background.copy(alpha = 0.85f))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Profile name text field
-            OutlinedTextField(
-                value = profileName,
-                onValueChange = { profileName = it },
-                placeholder = { Text("Profile name…", color = ConsensiusColors.TextSecondary, fontSize = 14.sp) },
-                singleLine = true,
-                modifier = Modifier.weight(1f).height(52.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor    = ConsensiusColors.Accent,
-                    unfocusedBorderColor  = ConsensiusColors.CardBorder,
-                    focusedContainerColor = ConsensiusColors.Surface.copy(alpha = 0.7f),
-                    unfocusedContainerColor = ConsensiusColors.Surface.copy(alpha = 0.5f),
-                    cursorColor = ConsensiusColors.Accent
-                )
-            )
-
-            Spacer(Modifier.width(8.dp))
-
-            // 3-dot menu
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                    modifier = Modifier.background(ConsensiusColors.Card)
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Save", color = ConsensiusColors.TextPrimary) },
-                        onClick = {
-                            menuExpanded = false
-                            saveProfile(profileName)
-                            onNavigateBack()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Save As…", color = ConsensiusColors.TextPrimary) },
-                        onClick = {
-                            menuExpanded = false
-                            saveAsName = profileName
-                            showSaveAsDialog = true
-                        }
-                    )
-                    HorizontalDivider(color = ConsensiusColors.CardBorder)
-                    DropdownMenuItem(
-                        text = { Text("Exit without saving", color = ConsensiusColors.Error) },
-                        onClick = {
-                            menuExpanded = false
-                            onNavigateBack()
-                        }
-                    )
-                }
-            }
-        }
-
-        // ── PAGE INDICATOR ────────────────────────────────────────────────────
+        // ── PAGE INDICATOR (bottom-center) ────────────────────────────────────
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp),
+                .padding(bottom = 80.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
-            pages.forEachIndexed { index, page ->
+            pages.forEachIndexed { index, _ ->
                 val isActive = index == currentPage
                 val dotSize by animateDpAsState(if (isActive) 10.dp else 6.dp, label = "dot")
                 Box(
@@ -373,7 +328,7 @@ fun ProfileEditorScreen(
             }
         }
 
-        // ── FAB (bottom right) ────────────────────────────────────────────────
+        // ── FAB cluster (bottom-right) ────────────────────────────────────────
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -381,11 +336,10 @@ fun ProfileEditorScreen(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Expanded FAB sub-options
             AnimatedVisibility(
                 visible = fabExpanded,
-                enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-                exit  = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
+                enter   = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                exit    = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
             ) {
                 Column(
                     horizontalAlignment = Alignment.End,
@@ -393,59 +347,161 @@ fun ProfileEditorScreen(
                 ) {
                     FabSubItem("Add Page") {
                         fabExpanded = false
-                        val newPageNum = pages.size + 1
-                        pages.add(ProfilePage(name = "Page $newPageNum"))
+                        pages.add(ProfilePage(name = "Page ${pages.size + 1}"))
                         currentPage = pages.size - 1
                     }
                     FabSubItem("Add Touchpad") {
                         fabExpanded = false
-                        addElement(CanvasElement(
-                            type = ElementType.TOUCHPAD, label = "TP",
-                            x = 0.5f, y = 0.5f, size = ElementSize.L
-                        ))
+                        addElement(CanvasElement(type = ElementType.TOUCHPAD, label = "MOUSE", x = 0.5f, y = 0.5f,
+                            width = ElementDefaults.TOUCHPAD_WIDTH, height = ElementDefaults.TOUCHPAD_HEIGHT))
                     }
                     FabSubItem("Add D-Pad") {
                         fabExpanded = false
-                        addElement(CanvasElement(
-                            type = ElementType.DPAD, label = "DPAD",
-                            x = 0.2f, y = 0.5f, size = ElementSize.L
-                        ))
+                        addElement(CanvasElement(type = ElementType.DPAD, label = "DPAD", x = 0.2f, y = 0.5f,
+                            width = ElementDefaults.DPAD_WIDTH, height = ElementDefaults.DPAD_HEIGHT))
                     }
                     FabSubItem("Add Joystick") {
                         fabExpanded = false
-                        addElement(CanvasElement(
-                            type = ElementType.JOYSTICK, label = "JS",
-                            x = 0.15f, y = 0.7f, size = ElementSize.L
-                        ))
+                        addElement(CanvasElement(type = ElementType.JOYSTICK, label = "MOVE", x = 0.15f, y = 0.7f,
+                            width = ElementDefaults.JOYSTICK_SIZE, height = ElementDefaults.JOYSTICK_SIZE))
                     }
                     FabSubItem("Add Button") {
                         fabExpanded = false
-                        addElement(CanvasElement(
-                            type = ElementType.BUTTON, label = "BTN",
-                            x = 0.5f, y = 0.5f, size = ElementSize.M
-                        ))
+                        addElement(CanvasElement(type = ElementType.BUTTON, label = "BTN", x = 0.5f, y = 0.5f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT))
                     }
                 }
             }
 
             FloatingActionButton(
-                onClick = { fabExpanded = !fabExpanded },
+                onClick        = { fabExpanded = !fabExpanded },
                 containerColor = ConsensiusColors.Accent,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.size(56.dp)
+                contentColor   = Color.White,
+                shape          = CircleShape,
+                modifier       = Modifier.size(56.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add element")
             }
         }
+
+        // ── TOP-RIGHT 3-DOT MENU — replaces the blocking full-width top bar ──
+        // Small semi-transparent pill so the entire canvas is usable for layout.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 8.dp, end = 8.dp)
+        ) {
+            // Semi-transparent profile name chip + ⋮ icon
+            Row(
+                modifier = Modifier
+                    .background(
+                        ConsensiusColors.Card.copy(alpha = 0.75f),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .border(1.dp, ConsensiusColors.CardBorder.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                    .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text       = profileName.take(16).ifBlank { "Untitled" },
+                    color      = ConsensiusColors.TextPrimary.copy(alpha = 0.85f),
+                    fontSize   = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines   = 1
+                )
+                IconButton(
+                    onClick  = { menuExpanded = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Menu",
+                        tint    = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            DropdownMenu(
+                expanded         = menuExpanded,
+                onDismissRequest = { menuExpanded = false },
+                modifier         = Modifier.background(ConsensiusColors.Card)
+            ) {
+                DropdownMenuItem(
+                    text    = { Text("✏  Edit profile name", color = ConsensiusColors.TextPrimary) },
+                    onClick = { menuExpanded = false; showNameDialog = true }
+                )
+                HorizontalDivider(color = ConsensiusColors.CardBorder)
+                DropdownMenuItem(
+                    text    = { Text("💾  Save", color = ConsensiusColors.TextPrimary) },
+                    onClick = { menuExpanded = false; saveProfile(profileName) }
+                )
+                DropdownMenuItem(
+                    text    = { Text("Save As…", color = ConsensiusColors.TextPrimary) },
+                    onClick = { menuExpanded = false; saveAsName = profileName; showSaveAsDialog = true }
+                )
+                HorizontalDivider(color = ConsensiusColors.CardBorder)
+                DropdownMenuItem(
+                    text    = { Text("Exit without saving", color = ConsensiusColors.Error) },
+                    onClick = { menuExpanded = false; onNavigateBack() }
+                )
+            }
+        }
+
+        // ── Snackbar ──────────────────────────────────────────────────────────
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier  = Modifier.align(Alignment.BottomCenter)
+        )
+    }
+
+    // ── Edit Profile Name dialog ──────────────────────────────────────────────
+    if (showNameDialog) {
+        var nameInput by remember { mutableStateOf(profileName) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showNameDialog = false },
+            containerColor   = ConsensiusColors.Card,
+            title = { Text("Profile Name", color = Color.White, fontWeight = FontWeight.Bold) },
+            text  = {
+                OutlinedTextField(
+                    value         = nameInput,
+                    onValueChange = { nameInput = it },
+                    singleLine    = true,
+                    placeholder   = { Text("e.g. My Layout", color = ConsensiusColors.TextSecondary) },
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor      = ConsensiusColors.Accent,
+                        unfocusedBorderColor    = ConsensiusColors.CardBorder,
+                        focusedTextColor        = Color.White,
+                        unfocusedTextColor      = Color.White,
+                        cursorColor             = ConsensiusColors.Accent,
+                        focusedContainerColor   = ConsensiusColors.Surface,
+                        unfocusedContainerColor = ConsensiusColors.Surface
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { profileName = nameInput.ifBlank { "Untitled" }; showNameDialog = false },
+                    colors  = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameDialog = false }) {
+                    Text("CANCEL", color = ConsensiusColors.TextSecondary)
+                }
+            }
+        )
     }
 
     // ── Element settings bottom sheet ─────────────────────────────────────────
-    settingsElement?.let { el ->
+    val liveSettingsElement = settingsElement?.id?.let { id ->
+        pages.getOrNull(currentPage)?.elements?.firstOrNull { it.id == id }
+    }
+    liveSettingsElement?.let { el ->
         ModalBottomSheet(
             onDismissRequest = { settingsElement = null },
-            sheetState = sheetState,
-            containerColor = ConsensiusColors.Card,
+            sheetState       = sheetState,
+            containerColor   = ConsensiusColors.Card,
             dragHandle = {
                 Box(
                     modifier = Modifier
@@ -457,15 +513,12 @@ fun ProfileEditorScreen(
             }
         ) {
             ElementSettingsSheet(
-                element = el,
+                element  = el,
                 onUpdate = { updated ->
                     updateElement(updated)
                     settingsElement = updated
                 },
-                onDelete = {
-                    deleteElement(el.id)
-                    settingsElement = null
-                },
+                onDelete  = { deleteElement(el.id); settingsElement = null },
                 onDismiss = { settingsElement = null }
             )
         }
@@ -475,20 +528,20 @@ fun ProfileEditorScreen(
     if (showSaveAsDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showSaveAsDialog = false },
-            containerColor = ConsensiusColors.Card,
+            containerColor   = ConsensiusColors.Card,
             title = { Text("Save As", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
+            text  = {
                 OutlinedTextField(
-                    value = saveAsName,
+                    value         = saveAsName,
                     onValueChange = { saveAsName = it },
-                    label = { Text("New profile name", color = ConsensiusColors.TextSecondary) },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor   = ConsensiusColors.Accent,
-                        unfocusedBorderColor = ConsensiusColors.CardBorder,
-                        focusedTextColor     = Color.White,
-                        unfocusedTextColor   = Color.White,
-                        cursorColor          = ConsensiusColors.Accent,
+                    label         = { Text("New profile name", color = ConsensiusColors.TextSecondary) },
+                    singleLine    = true,
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor      = ConsensiusColors.Accent,
+                        unfocusedBorderColor    = ConsensiusColors.CardBorder,
+                        focusedTextColor        = Color.White,
+                        unfocusedTextColor      = Color.White,
+                        cursorColor             = ConsensiusColors.Accent,
                         focusedContainerColor   = ConsensiusColors.Surface,
                         unfocusedContainerColor = ConsensiusColors.Surface
                     )
@@ -496,14 +549,13 @@ fun ProfileEditorScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        val newId = UUID.randomUUID().toString()
-                        saveProfile(saveAsName, newId)
+                    onClick  = {
+                        saveProfile(saveAsName, UUID.randomUUID().toString())
                         showSaveAsDialog = false
                         onNavigateBack()
                     },
                     enabled = saveAsName.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
+                    colors  = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
                 ) { Text("SAVE") }
             },
             dismissButton = {
@@ -519,26 +571,25 @@ fun ProfileEditorScreen(
 @Composable
 private fun FabSubItem(label: String, onClick: () -> Unit) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Label chip
         Text(
-            text = label,
-            color = Color.White,
-            fontSize = 12.sp,
+            text       = label,
+            color      = Color.White,
+            fontSize   = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
+            modifier   = Modifier
                 .shadow(4.dp, RoundedCornerShape(6.dp))
                 .background(ConsensiusColors.Card, RoundedCornerShape(6.dp))
                 .padding(horizontal = 10.dp, vertical = 6.dp)
         )
         SmallFloatingActionButton(
-            onClick = onClick,
+            onClick        = onClick,
             containerColor = ConsensiusColors.AccentSecondary,
-            contentColor = Color.Black,
-            shape = CircleShape,
-            modifier = Modifier.size(40.dp)
+            contentColor   = Color.Black,
+            shape          = CircleShape,
+            modifier       = Modifier.size(40.dp)
         ) {
             Icon(Icons.Default.Add, contentDescription = label, modifier = Modifier.size(18.dp))
         }
@@ -551,31 +602,30 @@ private fun CanvasElementWidget(
     element: CanvasElement,
     onSettingsTap: () -> Unit
 ) {
-    val sizeDp = element.size.toDp().dp
+    val widthDp  = element.width.dp
+    val heightDp = element.height.dp
 
     Box(contentAlignment = Alignment.Center) {
         when (element.type) {
             ElementType.BUTTON -> {
                 Box(
                     modifier = Modifier
-                        .size(sizeDp)
+                        .width(widthDp)
+                        .height(heightDp)
                         .shadow(6.dp, CircleShape)
                         .clip(CircleShape)
                         .background(ConsensiusColors.Accent.copy(alpha = 0.18f))
                         .border(1.5.dp, ConsensiusColors.Accent.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = element.label,
-                        color = Color.White,
-                        fontSize = (sizeDp.value * 0.22f).sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                    val labelSize = (minOf(widthDp, heightDp).value * 0.22f).sp
+                    Text(element.label, color = Color.White, fontSize = labelSize,
+                        fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 }
             }
 
             ElementType.JOYSTICK -> {
+                val sizeDp = widthDp
                 Box(
                     modifier = Modifier
                         .size(sizeDp)
@@ -585,45 +635,36 @@ private fun CanvasElementWidget(
                         .border(1.5.dp, ConsensiusColors.AccentSecondary.copy(alpha = 0.6f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Inner circle thumb indicator
-                    Box(
-                        modifier = Modifier
-                            .size(sizeDp * 0.38f)
-                            .background(ConsensiusColors.AccentSecondary.copy(alpha = 0.5f), CircleShape)
-                    )
+                    Box(modifier = Modifier.size(sizeDp * 0.38f)
+                        .background(ConsensiusColors.AccentSecondary.copy(alpha = 0.5f), CircleShape))
                     Text(
-                        text = if (element.joystickConfig.type == JoystickType.SKILL_AIM) "AIM" else "MOV",
-                        color = ConsensiusColors.AccentSecondary.copy(alpha = 0.8f),
-                        fontSize = (sizeDp.value * 0.16f).sp,
+                        text       = if (element.joystickConfig.type == JoystickType.SKILL_AIM) "AIM" else "MOV",
+                        color      = ConsensiusColors.AccentSecondary.copy(alpha = 0.8f),
+                        fontSize   = (sizeDp.value * 0.16f).sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
 
             ElementType.DPAD -> {
-                // Cross shape via Canvas draw
-                val crossColor = ConsensiusColors.TextSecondary.copy(alpha = 0.5f)
+                val crossColor  = ConsensiusColors.TextSecondary.copy(alpha = 0.5f)
                 val borderColor = ConsensiusColors.Accent.copy(alpha = 0.5f)
-                Canvas(modifier = Modifier.size(sizeDp)) {
-                    val s = size.minDimension
-                    val arm = s * 0.28f
-                    val cx = s / 2f
-                    val cy = s / 2f
-                    // Horizontal bar
-                    drawRect(crossColor, topLeft = Offset(cx - s * 0.5f, cy - arm / 2), size = Size(s, arm))
-                    // Vertical bar
-                    drawRect(crossColor, topLeft = Offset(cx - arm / 2, cy - s * 0.5f), size = Size(arm, s))
-                    // Border
-                    drawRect(borderColor, topLeft = Offset(cx - s * 0.5f, cy - arm / 2), size = Size(s, arm), style = Stroke(1.5f))
-                    drawRect(borderColor, topLeft = Offset(cx - arm / 2, cy - s * 0.5f), size = Size(arm, s), style = Stroke(1.5f))
+                Canvas(modifier = Modifier.width(widthDp).height(heightDp)) {
+                    val w = size.width; val h = size.height
+                    val arm = minOf(w, h) * 0.28f
+                    val cx = w / 2f; val cy = h / 2f
+                    drawRect(crossColor, Offset(cx - w * 0.5f, cy - arm / 2), Size(w, arm))
+                    drawRect(crossColor, Offset(cx - arm / 2, cy - h * 0.5f), Size(arm, h))
+                    drawRect(borderColor, Offset(cx - w * 0.5f, cy - arm / 2), Size(w, arm), style = Stroke(1.5f))
+                    drawRect(borderColor, Offset(cx - arm / 2, cy - h * 0.5f), Size(arm, h), style = Stroke(1.5f))
                 }
             }
 
             ElementType.TOUCHPAD -> {
                 Box(
                     modifier = Modifier
-                        .width(sizeDp * 2.5f)
-                        .height(sizeDp)
+                        .width(widthDp * 2.5f)
+                        .height(heightDp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(ConsensiusColors.Surface.copy(alpha = 0.5f))
                         .border(1.dp, ConsensiusColors.AccentSecondary.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
@@ -631,31 +672,24 @@ private fun CanvasElementWidget(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("TOUCHPAD", color = ConsensiusColors.TextSecondary.copy(alpha = 0.6f), fontSize = 9.sp, letterSpacing = 1.sp)
-                        Text(
-                            "×${element.touchpadConfig.sensitivityMultiplier}",
-                            color = ConsensiusColors.AccentSecondary.copy(alpha = 0.5f),
-                            fontSize = 10.sp
-                        )
+                        Text("×${element.touchpadConfig.sensitivityMultiplier}",
+                            color = ConsensiusColors.AccentSecondary.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
                 }
             }
         }
 
-        // ⚙ Gear icon on top-right corner
+        // ⚙ Gear icon
         IconButton(
-            onClick = onSettingsTap,
+            onClick  = onSettingsTap,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .size(20.dp)
                 .offset(x = 6.dp, y = (-6).dp)
                 .background(ConsensiusColors.Card.copy(alpha = 0.85f), CircleShape)
         ) {
-            Icon(
-                Icons.Default.Settings,
-                contentDescription = "Element settings",
-                tint = ConsensiusColors.Accent,
-                modifier = Modifier.size(12.dp)
-            )
+            Icon(Icons.Default.Settings, contentDescription = "Settings",
+                tint = ConsensiusColors.Accent, modifier = Modifier.size(12.dp))
         }
     }
 }
@@ -675,11 +709,11 @@ private fun ElementSettingsSheet(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Header
+        // Header row
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             Text(
                 text = when (element.type) {
@@ -688,9 +722,7 @@ private fun ElementSettingsSheet(
                     ElementType.DPAD     -> "✚  D-Pad Settings"
                     ElementType.TOUCHPAD -> "▭  Touchpad Settings"
                 },
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp
             )
             TextButton(onClick = onDelete) {
                 Text("DELETE", color = ConsensiusColors.Error, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -699,25 +731,55 @@ private fun ElementSettingsSheet(
 
         HorizontalDivider(color = ConsensiusColors.CardBorder)
 
-        // Size selector (all types)
-        SheetLabel("Size")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ElementSize.values().forEach { size ->
-                val selected = element.size == size
-                Button(
-                    onClick = { onUpdate(element.copy(size = size)) },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selected) ConsensiusColors.Accent else ConsensiusColors.Surface
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(size.name, color = if (selected) Color.White else ConsensiusColors.TextSecondary, fontSize = 13.sp)
-                }
+        // ── Size sliders ─────────────────────────────────────────────────────
+        // FIX SLIDER LAG: local state updates the slider visual INSTANTLY.
+        // onValueChangeFinished writes to the model ONCE when user lifts finger —
+        // this avoids triggering full recomposition on every slider pixel.
+        when (element.type) {
+            ElementType.JOYSTICK -> {
+                var size by remember(element.id) { mutableFloatStateOf(element.width) }
+                SheetLabel("Size: ${size.roundToInt()}dp")
+                Slider(
+                    value                 = size,
+                    onValueChange         = { size = it },
+                    onValueChangeFinished = { onUpdate(element.copy(width = size, height = size)) },
+                    valueRange            = 80f..300f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                )
+            }
+            ElementType.TOUCHPAD -> { /* no size sliders for touchpad */ }
+            else -> {
+                // BUTTON and DPAD — separate Width and Height sliders
+                var elWidth  by remember(element.id) { mutableFloatStateOf(element.width) }
+                var elHeight by remember(element.id) { mutableFloatStateOf(element.height) }
+
+                SheetLabel("Width: ${elWidth.roundToInt()}dp")
+                Slider(
+                    value                 = elWidth,
+                    onValueChange         = { elWidth = it },
+                    onValueChangeFinished = { onUpdate(element.copy(width = elWidth, height = elHeight)) },
+                    valueRange            = 40f..300f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                )
+
+                SheetLabel("Height: ${elHeight.roundToInt()}dp")
+                Slider(
+                    value                 = elHeight,
+                    onValueChange         = { elHeight = it },
+                    onValueChangeFinished = { onUpdate(element.copy(width = elWidth, height = elHeight)) },
+                    valueRange            = 40f..300f,
+                    colors = SliderDefaults.colors(
+                        thumbColor       = ConsensiusColors.AccentSecondary,
+                        activeTrackColor = ConsensiusColors.AccentSecondary)
+                )
             }
         }
 
-        // Type-specific settings
+        HorizontalDivider(color = ConsensiusColors.CardBorder.copy(alpha = 0.5f))
+
+        // ── Type-specific settings ────────────────────────────────────────────
         when (element.type) {
             ElementType.BUTTON -> {
                 var label by remember(element.id) { mutableStateOf(element.label) }
@@ -731,23 +793,28 @@ private fun ElementSettingsSheet(
             }
 
             ElementType.JOYSTICK -> {
+                var jsLabel by remember(element.id) { mutableStateOf(element.label) }
+                SheetLabel("Element Label (max 8)")
+                SheetTextField(jsLabel, {
+                    jsLabel = it.take(8); onUpdate(element.copy(label = jsLabel))
+                }, "e.g. MOVE, AIM")
+
                 SheetLabel("Joystick Type")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     JoystickType.values().forEach { jsType ->
                         val selected = element.joystickConfig.type == jsType
                         Button(
-                            onClick = { onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(type = jsType))) },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selected) ConsensiusColors.Accent else ConsensiusColors.Surface
-                            ),
+                            onClick = {
+                                val newLabel = if (jsLabel.isBlank()) (if (jsType == JoystickType.MOVEMENT) "MOVE" else "AIM") else jsLabel
+                                onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(type = jsType), label = newLabel))
+                                jsLabel = newLabel
+                            },
+                            shape  = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (selected) ConsensiusColors.Accent else ConsensiusColors.Surface),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                if (jsType == JoystickType.MOVEMENT) "Movement" else "Skill-Aim",
-                                color = if (selected) Color.White else ConsensiusColors.TextSecondary,
-                                fontSize = 12.sp
-                            )
+                            Text(if (jsType == JoystickType.MOVEMENT) "Movement" else "Skill-Aim",
+                                color = if (selected) Color.White else ConsensiusColors.TextSecondary, fontSize = 12.sp)
                         }
                     }
                 }
@@ -756,13 +823,18 @@ private fun ElementSettingsSheet(
                     var skillKey by remember(element.id) { mutableStateOf(element.joystickConfig.skillKey) }
                     SheetLabel("Skill Key Mapping")
                     SheetTextField(skillKey, {
-                        skillKey = it
-                        onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(skillKey = it)))
+                        skillKey = it; onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(skillKey = it)))
                     }, "e.g. k, q")
                 }
             }
 
             ElementType.DPAD -> {
+                var dpadLabel by remember(element.id) { mutableStateOf(element.label) }
+                SheetLabel("Element Label (max 8)")
+                SheetTextField(dpadLabel, {
+                    dpadLabel = it.take(8); onUpdate(element.copy(label = dpadLabel))
+                }, "e.g. DPAD")
+
                 var upKey    by remember(element.id) { mutableStateOf(element.dpadConfig.upKey) }
                 var downKey  by remember(element.id) { mutableStateOf(element.dpadConfig.downKey) }
                 var leftKey  by remember(element.id) { mutableStateOf(element.dpadConfig.leftKey) }
@@ -771,72 +843,52 @@ private fun ElementSettingsSheet(
                 SheetLabel("Key Mappings")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("↑ Up", upKey) {
-                            upKey = it
-                            onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey)))
-                        }
+                        SheetMiniKeyField("Up", upKey) { upKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("↓ Down", downKey) {
-                            downKey = it
-                            onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey)))
-                        }
+                        SheetMiniKeyField("Down", downKey) { downKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("← Left", leftKey) {
-                            leftKey = it
-                            onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey)))
-                        }
+                        SheetMiniKeyField("Left", leftKey) { leftKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("→ Right", rightKey) {
-                            rightKey = it
-                            onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey)))
-                        }
+                        SheetMiniKeyField("Right", rightKey) { rightKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                 }
             }
 
             ElementType.TOUCHPAD -> {
+                var tpLabel     by remember(element.id) { mutableStateOf(element.label) }
                 var sensitivity by remember(element.id) { mutableFloatStateOf(element.touchpadConfig.sensitivityMultiplier) }
                 var lClick      by remember(element.id) { mutableStateOf(element.touchpadConfig.leftClickKey) }
                 var rClick      by remember(element.id) { mutableStateOf(element.touchpadConfig.rightClickKey) }
 
-                SheetLabel("Sensitivity ×${String.format("%.1f", sensitivity)}")
+                SheetLabel("Element Label (max 8)")
+                SheetTextField(tpLabel, { tpLabel = it.take(8); onUpdate(element.copy(label = tpLabel)) }, "e.g. MOUSE")
+
+                SheetLabel("Sensitivity x${String.format("%.1f", sensitivity)}")
                 Slider(
-                    value = sensitivity,
-                    onValueChange = {
-                        sensitivity = it
-                        onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(it, lClick, rClick)))
-                    },
-                    valueRange = 0.5f..5.0f,
-                    colors = SliderDefaults.colors(
-                        thumbColor       = ConsensiusColors.Accent,
-                        activeTrackColor = ConsensiusColors.Accent
-                    )
+                    value                 = sensitivity,
+                    onValueChange         = { sensitivity = it },
+                    onValueChangeFinished = { onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, lClick, rClick))) },
+                    valueRange            = 0.5f..5.0f,
+                    colors = SliderDefaults.colors(thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
                 )
 
                 SheetLabel("Left Click Key")
-                SheetTextField(lClick, {
-                    lClick = it
-                    onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, it, rClick)))
-                }, "e.g. mouse1")
+                SheetTextField(lClick, { lClick = it; onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, it, rClick))) }, "e.g. mouse1")
 
                 SheetLabel("Right Click Key")
-                SheetTextField(rClick, {
-                    rClick = it
-                    onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, lClick, it)))
-                }, "e.g. mouse2")
+                SheetTextField(rClick, { rClick = it; onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, lClick, it))) }, "e.g. mouse2")
             }
         }
 
-        // Bottom close button
         Spacer(Modifier.height(4.dp))
         Button(
-            onClick = onDismiss,
+            onClick  = onDismiss,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
+            shape    = RoundedCornerShape(10.dp),
+            colors   = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
         ) {
             Text("DONE", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
         }
@@ -847,32 +899,25 @@ private fun ElementSettingsSheet(
 // ─── Sheet helpers ─────────────────────────────────────────────────────────────
 @Composable
 private fun SheetLabel(text: String) {
-    Text(
-        text = text,
-        color = ConsensiusColors.Accent,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.2.sp
-    )
+    Text(text = text, color = ConsensiusColors.Accent, fontSize = 10.sp,
+        fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
 }
 
 @Composable
 private fun SheetTextField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
     OutlinedTextField(
-        value = value,
+        value         = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = ConsensiusColors.TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        textStyle = androidx.compose.ui.text.TextStyle(
-            fontSize = 14.sp, color = Color.White
-        ),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor    = ConsensiusColors.Accent,
-            unfocusedBorderColor  = ConsensiusColors.CardBorder,
-            focusedContainerColor = ConsensiusColors.Surface,
+        placeholder   = { Text(placeholder, color = ConsensiusColors.TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp) },
+        singleLine    = true,
+        modifier      = Modifier.fillMaxWidth(),
+        textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = Color.White),
+        colors        = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor      = ConsensiusColors.Accent,
+            unfocusedBorderColor    = ConsensiusColors.CardBorder,
+            focusedContainerColor   = ConsensiusColors.Surface,
             unfocusedContainerColor = ConsensiusColors.Surface,
-            cursorColor = ConsensiusColors.Accent
+            cursorColor             = ConsensiusColors.Accent
         )
     )
 }
@@ -880,22 +925,18 @@ private fun SheetTextField(value: String, onValueChange: (String) -> Unit, place
 @Composable
 private fun SheetMiniKeyField(label: String, value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
-        value = value,
+        value         = value,
         onValueChange = { onValueChange(it.take(10)) },
-        label = { Text(label, fontSize = 9.sp, color = ConsensiusColors.TextSecondary) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().height(60.dp),
-        textStyle = androidx.compose.ui.text.TextStyle(
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        ),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor    = ConsensiusColors.Accent,
-            unfocusedBorderColor  = ConsensiusColors.CardBorder,
-            focusedContainerColor = ConsensiusColors.Surface,
+        label         = { Text(label, fontSize = 9.sp, color = ConsensiusColors.TextSecondary) },
+        singleLine    = true,
+        modifier      = Modifier.fillMaxWidth().height(60.dp),
+        textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White),
+        colors        = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor      = ConsensiusColors.Accent,
+            unfocusedBorderColor    = ConsensiusColors.CardBorder,
+            focusedContainerColor   = ConsensiusColors.Surface,
             unfocusedContainerColor = ConsensiusColors.Surface,
-            cursorColor = ConsensiusColors.Accent
+            cursorColor             = ConsensiusColors.Accent
         )
     )
 }

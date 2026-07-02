@@ -218,28 +218,19 @@ class InputHandler:
         if key is None:
             return
 
-        # skill_aim_distance is treated as a PERCENTAGE (0–100) of the screen WIDTH.
-        # Default 25 → at magnitude=1.0 the cursor moves screen_width * 0.25 pixels.
-        # On a 1920-wide display: 25% = 480 px, covering most of the targeting range.
-        # (Old small values like 80 are used as-is and will be ≈ 80% of screen width
-        #  if the user hasn't updated their settings — warn them if > 100.)
-        sad_pct     = self._settings.get("skill_aim_distance", 25)
-        # Get or cache screen width
-        if self._screen_size[0] < 0:
-            try:
-                sw = ctypes.windll.user32.GetSystemMetrics(0)
-                sh = ctypes.windll.user32.GetSystemMetrics(1)
-                self._screen_size = (sw, sh)
-            except Exception:
-                self._screen_size = (1920, 1080)
-        screen_w = self._screen_size[0]
-        # Convert % to pixels (clamp to something reasonable)
-        max_px = int(screen_w * (min(float(sad_pct), 100.0) / 100.0))
-        max_px = max(max_px, 60)  # at least 60 px
+        # skill_aim_distance is a direct pixel value (default 300px).
+        # Exponential scaling: small drags stay small, full drag = very wide range.
+        # scaled_magnitude = magnitude^0.7 gives a nice curve:
+        #   mag=0.3 -> 0.47, mag=0.7 -> 0.79, mag=1.0 -> 1.0
+        max_px = float(self._settings.get("skill_aim_distance", 300))
+        max_px = max(max_px, 50.0)  # at least 50 px
+
+        # Apply exponential curve (prevents tiny movement for small drags)
+        scaled_magnitude = magnitude ** 0.7 if magnitude > 0 else 0.0
 
         angle_rad = math.radians(angle)
-        aim_dx = int(math.cos(angle_rad) * magnitude * max_px)
-        aim_dy = int(math.sin(angle_rad) * magnitude * max_px)
+        aim_dx = int(math.cos(angle_rad) * scaled_magnitude * max_px)
+        aim_dy = int(math.sin(angle_rad) * scaled_magnitude * max_px)
 
         with self._lock:
             if state == "aiming":
