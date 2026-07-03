@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-ui/settings_page.py
-===================
+ui/settings_page.py  (v1.2)
+===========================
 Settings page: port, start-on-launch, mouse sensitivity, joystick threshold,
 and Skill Aim Positions (capture the screen position of each skill button).
+
+v1.2 fix: SETTINGS_FILE now resolves correctly when running as a PyInstaller
+one-file .exe. Previously __file__ pointed to the temp _MEI folder (deleted
+on exit), so settings were lost on every relaunch.
 """
 import json
+import sys
 import time
 import threading
 import customtkinter as ctk
@@ -29,7 +34,19 @@ BORDER  = "#1A2535"
 ERROR   = "#FF1744"
 WARN    = "#FFB300"
 
-SETTINGS_FILE = Path(__file__).resolve().parent.parent / "settings.json"
+def _get_settings_file() -> Path:
+    """
+    Returns the persistent path to settings.json.
+    When frozen as a PyInstaller exe, __file__ resolves to the temp extraction
+    folder which is wiped on every launch. We use sys.executable instead so
+    settings.json always lives next to the .exe.
+    """
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent / "settings.json"
+    # Running as plain Python script: go up from ui/ to project root
+    return Path(__file__).resolve().parent.parent / "settings.json"
+
+SETTINGS_FILE = _get_settings_file()
 
 # Default skill keys shown in the Skill Aim Positions panel
 DEFAULT_SKILL_KEYS = ["j", "k", "l", "u", "i", "f"]

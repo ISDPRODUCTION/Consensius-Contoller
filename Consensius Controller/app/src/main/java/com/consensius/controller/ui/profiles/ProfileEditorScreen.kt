@@ -235,7 +235,7 @@ fun ProfileEditorScreen(
                     val heightDp      = el.height.dp
                     val widthPx       = with(density) { widthDp.toPx() }
                     val heightPx      = with(density) { heightDp.toPx() }
-                    val visualWidthPx = if (el.type == ElementType.TOUCHPAD) widthPx * 2.5f else widthPx
+                    val visualWidthPx = widthPx  // width is now the actual visual width for all element types
 
                     // Local drag offset — initialised from stored fraction position
                     var offsetX by remember { mutableFloatStateOf((el.x * canvasWidthPx - visualWidthPx / 2).coerceAtLeast(0f)) }
@@ -253,12 +253,8 @@ fun ProfileEditorScreen(
                     Box(
                         modifier = Modifier
                             .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                            .then(
-                                if (el.type == ElementType.TOUCHPAD)
-                                    Modifier.width(widthDp * 2.5f).height(heightDp)
-                                else
-                                    Modifier.width(widthDp).height(heightDp)
-                            )
+                            .width(widthDp)
+                            .height(heightDp)
                             // FIX DRAG PERFORMANCE: update model only on drag END, not every frame.
                             // FIX DRAG FLIES: pointerInput key includes el.width + el.height so the
                             //   lambda always captures the CURRENT visualWidthPx / heightPx after a
@@ -352,7 +348,7 @@ fun ProfileEditorScreen(
                     }
                     FabSubItem("Add Touchpad") {
                         fabExpanded = false
-                        addElement(CanvasElement(type = ElementType.TOUCHPAD, label = "MOUSE", x = 0.5f, y = 0.5f,
+                        addElement(CanvasElement(type = ElementType.TOUCHPAD, label = "MOUSE", x = 0.5f, y = 0.7f,
                             width = ElementDefaults.TOUCHPAD_WIDTH, height = ElementDefaults.TOUCHPAD_HEIGHT))
                     }
                     FabSubItem("Add D-Pad") {
@@ -663,7 +659,7 @@ private fun CanvasElementWidget(
             ElementType.TOUCHPAD -> {
                 Box(
                     modifier = Modifier
-                        .width(widthDp * 2.5f)
+                        .width(widthDp)
                         .height(heightDp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(ConsensiusColors.Surface.copy(alpha = 0.5f))
@@ -672,7 +668,7 @@ private fun CanvasElementWidget(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("TOUCHPAD", color = ConsensiusColors.TextSecondary.copy(alpha = 0.6f), fontSize = 9.sp, letterSpacing = 1.sp)
-                        Text("×${element.touchpadConfig.sensitivityMultiplier}",
+                        Text("${widthDp.value.roundToInt()}×${heightDp.value.roundToInt()}dp",
                             color = ConsensiusColors.AccentSecondary.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
                 }
@@ -748,7 +744,32 @@ private fun ElementSettingsSheet(
                         thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
                 )
             }
-            ElementType.TOUCHPAD -> { /* no size sliders for touchpad */ }
+            ElementType.TOUCHPAD -> {
+                // Width and Height sliders for touchpad
+                var tpWidth  by remember(element.id) { mutableFloatStateOf(element.width) }
+                var tpHeight by remember(element.id) { mutableFloatStateOf(element.height) }
+
+                SheetLabel("Width: ${tpWidth.roundToInt()}dp")
+                Slider(
+                    value                 = tpWidth,
+                    onValueChange         = { tpWidth = it },
+                    onValueChangeFinished = { onUpdate(element.copy(width = tpWidth, height = tpHeight)) },
+                    valueRange            = 150f..700f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                )
+
+                SheetLabel("Height: ${tpHeight.roundToInt()}dp")
+                Slider(
+                    value                 = tpHeight,
+                    onValueChange         = { tpHeight = it },
+                    onValueChangeFinished = { onUpdate(element.copy(width = tpWidth, height = tpHeight)) },
+                    valueRange            = 60f..300f,
+                    colors = SliderDefaults.colors(
+                        thumbColor       = ConsensiusColors.AccentSecondary,
+                        activeTrackColor = ConsensiusColors.AccentSecondary)
+                )
+            }
             else -> {
                 // BUTTON and DPAD — separate Width and Height sliders
                 var elWidth  by remember(element.id) { mutableFloatStateOf(element.width) }

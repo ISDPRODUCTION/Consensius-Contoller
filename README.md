@@ -546,6 +546,7 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 - ✅ Coba nonaktifkan sementara antivirus atau firewall pihak ketiga
 - ✅ Periksa IP PC dengan `ipconfig` di Command Prompt dan masukkan manual
 
+
 ### Keyboard/mouse tidak merespons di game
 - ✅ Jalankan `main.py` sebagai **Administrator** di Windows
 - ✅ Pastikan jendela game berada di **foreground** (tidak diminimize)

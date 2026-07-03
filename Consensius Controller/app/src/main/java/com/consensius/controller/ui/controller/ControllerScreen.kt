@@ -192,7 +192,7 @@ fun ControllerScreen(
     // Element bounding boxes in root coords (px) for hit testing
     val elementBounds = remember { mutableStateMapOf<String, android.graphics.RectF>() }
 
-    // Touchpad actual rendered bounds (wider than the positioning box — 2.5× width)
+    // Touchpad actual rendered bounds — same as elementBounds now that 2.5× factor is gone
     val touchpadActualBounds = remember { mutableStateMapOf<String, android.graphics.RectF>() }
 
     // ── Pointer → element mapping ─────────────────────────────────────────────
@@ -313,15 +313,9 @@ fun ControllerScreen(
     }
 
     // ── Pointer event dispatcher ───────────────────────────────────────────────
-    // BUG 3 FIX: Touchpad hit testing uses touchpadActualBounds (which capture the full
-    // rendered width = sizeDp * 2.5f) instead of the narrower positioning Box bounds.
     fun findElementAt(rawX: Float, rawY: Float, elements: List<CanvasElement>): CanvasElement? {
         for (el in elements.reversed()) { // top elements first
-            val rect = if (el.type == ElementType.TOUCHPAD) {
-                touchpadActualBounds[el.id] ?: elementBounds[el.id]
-            } else {
-                elementBounds[el.id]
-            } ?: continue
+            val rect = elementBounds[el.id] ?: continue
             if (rect.contains(rawX, rawY)) return el
         }
         return null
@@ -806,7 +800,6 @@ fun ControllerScreen(
                 currentElements.forEach { el ->
                     val widthDp  = el.width.dp
                     val heightDp = el.height.dp
-                    // For touchpad the visual box is 2.5× wider — center on el.width dp
                     val posX = screenW * el.x - widthDp / 2
                     val posY = screenH * el.y - heightDp / 2
                     val state = elementStates[el.id] ?: ElementRuntimeState()
@@ -1204,10 +1197,9 @@ private fun ControllerTouchpad(
     isActive: Boolean,
     onBoundsChanged: (android.graphics.RectF) -> Unit = {}
 ) {
-    val w = widthDp * 2.5f
     Box(
         modifier = Modifier
-            .width(w)
+            .width(widthDp)
             .height(heightDp)
             .background(
                 Brush.linearGradient(listOf(

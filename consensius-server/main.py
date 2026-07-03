@@ -2,7 +2,7 @@
 """
 main.py
 =======
-Consensius Server entry point.
+Consensus Server entry point.  v1.2
 - Loads settings from settings.json
 - Creates WebSocketServer + InputHandler
 - Launches CustomTkinter UI on main thread
@@ -13,13 +13,25 @@ import sys
 import io
 from pathlib import Path
 
+
+def _get_app_dir() -> Path:
+    """
+    Bug fix v1.2: When built as a PyInstaller one-file exe, __file__ points to
+    a temporary extraction folder (_MEIxxxxxx) that is deleted on exit, causing
+    settings.json to be lost every session. Use sys.executable instead so that
+    settings.json is always stored next to the running .exe.
+    """
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent
+    return Path(__file__).resolve().parent
+
 # Fix Windows console encoding so print() never raises UnicodeEncodeError
 if hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 if hasattr(sys.stderr, 'buffer'):
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = _get_app_dir()
 SETTINGS_FILE = BASE_DIR / "settings.json"
 
 

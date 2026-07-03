@@ -15,8 +15,8 @@ object ElementDefaults {
     const val JOYSTICK_SIZE   = 150f  // always square/circular
     const val DPAD_WIDTH      = 160f
     const val DPAD_HEIGHT     = 160f
-    const val TOUCHPAD_WIDTH  = 200f
-    const val TOUCHPAD_HEIGHT = 80f
+    const val TOUCHPAD_WIDTH  = 500f   // actual visual width in dp (no longer multiplied by 2.5)
+    const val TOUCHPAD_HEIGHT = 120f
 }
 
 // ─── Element Config (per-type) ────────────────────────────────────────────────
