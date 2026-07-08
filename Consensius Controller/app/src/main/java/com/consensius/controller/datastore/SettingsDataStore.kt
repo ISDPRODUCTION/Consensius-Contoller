@@ -3,7 +3,7 @@ package com.consensius.controller.datastore
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
+
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -37,7 +37,7 @@ class SettingsDataStore(private val context: Context) {
         val SENSITIVITY         = floatPreferencesKey("sensitivity")
         val MOUSE_SENSITIVITY   = floatPreferencesKey("mouse_sensitivity")
         val SEND_FPS            = intPreferencesKey("send_fps")
-        val DARK_MODE           = booleanPreferencesKey("dark_mode")
+
         val SELECTED_PROFILE_ID = stringPreferencesKey("selected_profile_id")
         val PROFILES_JSON       = stringPreferencesKey("profiles_json")
     }
@@ -77,23 +77,19 @@ class SettingsDataStore(private val context: Context) {
         prefs[SEND_FPS] ?: 60
     }
 
-    val darkModeFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[DARK_MODE] ?: true
-    }
+
 
     suspend fun saveSettings(
         deadzone: Float,
         sensitivity: Float,
         mouseSensitivity: Float,
-        sendFps: Int,
-        darkMode: Boolean
+        sendFps: Int
     ) {
         context.dataStore.edit { prefs ->
             prefs[DEADZONE]          = deadzone
             prefs[SENSITIVITY]       = sensitivity
             prefs[MOUSE_SENSITIVITY] = mouseSensitivity
             prefs[SEND_FPS]          = sendFps
-            prefs[DARK_MODE]         = darkMode
         }
     }
 

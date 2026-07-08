@@ -8,8 +8,7 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -44,10 +43,7 @@ class MainActivity : ComponentActivity() {
         webSocketManager = WebSocketManager(lifecycleScope)
 
         setContent {
-            // Bug #4: dark mode from DataStore applied immediately
-            val darkMode by settingsDataStore.darkModeFlow.collectAsState(initial = true)
-
-            ConsensiusControllerTheme(darkTheme = darkMode) {
+            ConsensiusControllerTheme {
                 val navController = rememberNavController()
 
                 NavHost(

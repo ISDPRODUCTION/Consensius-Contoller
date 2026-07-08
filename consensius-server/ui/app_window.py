@@ -45,6 +45,16 @@ class AppWindow(ctk.CTk):
         self._active_page   = "connection"
         self._nav_buttons: Dict[str, ctk.CTkButton] = {}
 
+        # ── Fix #1: Log batch buffer ─────────────────────────────────────────
+        # Instead of scheduling self.after(0, ...) for EVERY incoming message
+        # (which floods the Tkinter event queue at 60–200 calls/s and causes
+        # the UI to lag more and more over time), we accumulate messages in a
+        # list and flush them all at once every LOG_FLUSH_MS milliseconds.
+        self._log_batch: list = []          # [(message, log_type), ...]
+        self._key_batch: list = []          # [("down"|"up", key, log_type), ...]
+        self._batch_flush_pending: bool = False
+        self._LOG_FLUSH_MS: int = 30        # flush UI at ~33 fps
+
         # Window setup
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -196,17 +206,24 @@ class AppWindow(ctk.CTk):
         monitor: MonitorPage = self._pages["monitor"]  # type: ignore
 
         def _on_log(message: str, log_type: str):
-            # Update monitor log
-            self.after(0, monitor.add_log, message, log_type)
-            # Update active-key badges based on type
+            # Fix #1: Append to batch instead of scheduling individual after(0) calls.
+            # The _flush_log_batch() timer will drain this list every LOG_FLUSH_MS ms.
+            self._log_batch.append((message, log_type))
+
+            # Button key-badge events are rare and important — queue them too
+            # so they get processed in the same flush pass.
             if log_type == "button":
-                # Parse "key → DOWN/UP"
-                if "→ DOWN" in message:
-                    key = message.split("→")[0].strip()
-                    self.after(0, monitor.set_key_down, key, log_type)
-                elif "→ UP" in message:
-                    key = message.split("→")[0].strip()
-                    self.after(0, monitor.set_key_up, key)
+                if "\u2192 DOWN" in message:
+                    key = message.split("\u2192")[0].strip()
+                    self._key_batch.append(("down", key, log_type))
+                elif "\u2192 UP" in message:
+                    key = message.split("\u2192")[0].strip()
+                    self._key_batch.append(("up", key, log_type))
+
+            # Schedule a single flush callback if none is pending yet.
+            if not self._batch_flush_pending:
+                self._batch_flush_pending = True
+                self.after(self._LOG_FLUSH_MS, self._flush_log_batch)
 
         def _on_connect(ip: str):
             self.after(0, self._on_client_connect, ip)
@@ -221,6 +238,28 @@ class AppWindow(ctk.CTk):
         self._server.on_connect    = _on_connect
         self._server.on_disconnect = _on_disconnect
         self._server.on_profile    = _on_profile
+
+    def _flush_log_batch(self) -> None:
+        """Fix #1: Drain the log batch and apply all pending UI updates at once.
+        Called by Tkinter's after() timer every LOG_FLUSH_MS ms.
+        Runs on the main thread — safe to touch all widgets directly.
+        """
+        self._batch_flush_pending = False
+        monitor: MonitorPage = self._pages["monitor"]  # type: ignore
+
+        # Drain log lines — batch insert into the Text widget
+        if self._log_batch:
+            batch, self._log_batch = self._log_batch, []
+            monitor.add_log_batch(batch)
+
+        # Drain key badge updates
+        if self._key_batch:
+            batch, self._key_batch = self._key_batch, []
+            for direction, key, log_type in batch:
+                if direction == "down":
+                    monitor.set_key_down(key, log_type)
+                else:
+                    monitor.set_key_up(key)
 
     def _on_client_connect(self, ip: str):
         conn_page: ConnectionPage = self._pages["connection"]  # type: ignore

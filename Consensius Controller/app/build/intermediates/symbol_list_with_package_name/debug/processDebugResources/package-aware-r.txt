@@ -680,6 +680,7 @@ drawable ic_call_decline
 drawable ic_call_decline_low
 drawable ic_launcher_background
 drawable ic_launcher_foreground
+drawable logo_consensius_full
 drawable notification_action_background
 drawable notification_bg
 drawable notification_bg_low
@@ -695,6 +696,7 @@ drawable notification_tile_bg
 drawable notify_panel_notification_icon_bg
 drawable tooltip_frame_dark
 drawable tooltip_frame_light
+font bangers
 id ALT
 id CTRL
 id FUNCTION

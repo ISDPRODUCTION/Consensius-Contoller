@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.consensius.controller.app-mergeDebugResources-60:/values-sl/values-sl.xml",
+            "outputFile": "com.consensius.controller.app-mergeDebugResources-61:/values-sl/values-sl.xml",
             "map": [
                 {
                     "source": "C:\\Users\\MSI Thin\\.gradle\\caches\\8.9\\transforms\\cedfcdeda882ce5910066bb7cb290990\\transformed\\ui-release\\res\\values-sl\\values-sl.xml",

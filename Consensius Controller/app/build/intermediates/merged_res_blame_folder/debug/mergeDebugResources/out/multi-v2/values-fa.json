@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.consensius.controller.app-mergeDebugResources-60:/values-fa/values-fa.xml",
+            "outputFile": "com.consensius.controller.app-mergeDebugResources-61:/values-fa/values-fa.xml",
             "map": [
                 {
                     "source": "C:\\Users\\MSI Thin\\.gradle\\caches\\8.9\\transforms\\b504f5c482a400dc90eeadbee771e830\\transformed\\foundation-release\\res\\values-fa\\values-fa.xml",

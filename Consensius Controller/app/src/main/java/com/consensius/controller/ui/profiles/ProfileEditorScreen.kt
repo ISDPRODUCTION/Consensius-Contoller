@@ -72,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -94,7 +95,7 @@ import com.consensius.controller.model.JoystickElementConfig
 import com.consensius.controller.model.JoystickType
 import com.consensius.controller.model.ProfilePage
 import com.consensius.controller.model.TouchpadElementConfig
-import com.consensius.controller.ui.theme.ConsensiusColors
+import com.consensius.controller.ui.theme.NeoColors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -112,7 +113,6 @@ fun ProfileEditorScreen(
     val density           = LocalDensity.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Force landscape orientation
     DisposableEffect(Unit) {
         val activity = context as? Activity
         val original = activity?.requestedOrientation
@@ -124,14 +124,11 @@ fun ProfileEditorScreen(
 
     val isNew = profileId == "new" || profileId.isNullOrBlank()
 
-    // ── Profile state ─────────────────────────────────────────────────────────
     var profileName by remember { mutableStateOf(if (isNew) "New Profile" else "Loading…") }
     var editingId   by remember { mutableStateOf(if (isNew) UUID.randomUUID().toString() else profileId ?: UUID.randomUUID().toString()) }
     val pages       = remember { mutableStateListOf<ProfilePage>() }
     var currentPage by remember { mutableIntStateOf(0) }
 
-    // ── UI state ──────────────────────────────────────────────────────────────
-    // Top-right 3-dot menu (replaces the full top bar)
     var menuExpanded      by remember { mutableStateOf(false) }
     var showNameDialog    by remember { mutableStateOf(false) }
     var fabExpanded       by remember { mutableStateOf(false) }
@@ -139,11 +136,9 @@ fun ProfileEditorScreen(
     var showSaveAsDialog  by remember { mutableStateOf(false) }
     var saveAsName        by remember { mutableStateOf("") }
 
-    // Canvas size in px
     var canvasWidthPx  by remember { mutableFloatStateOf(1f) }
     var canvasHeightPx by remember { mutableFloatStateOf(1f) }
 
-    // ── Load existing profile ─────────────────────────────────────────────────
     LaunchedEffect(profileId) {
         if (!isNew && profileId != null) {
             val profiles = settingsDataStore.profilesFlow.first()
@@ -159,7 +154,6 @@ fun ProfileEditorScreen(
         if (pages.isEmpty()) pages.add(ProfilePage(name = "Page 1"))
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
     fun currentElements(): List<CanvasElement> =
         pages.getOrNull(currentPage)?.elements ?: emptyList()
 
@@ -195,14 +189,12 @@ fun ProfileEditorScreen(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    // ─────────────────────────────────────────────────────────────────────────
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ConsensiusColors.Background)
+            .background(NeoColors.Background)
     ) {
-
-        // ── Dot-grid canvas (full-screen, no top bar blocking) ─────────────────
+        // ── Dot-grid canvas ──────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -213,38 +205,30 @@ fun ProfileEditorScreen(
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val spacing  = 28.dp.toPx()
-                val dotColor = Color(0xFF00C2FF).copy(alpha = 0.12f)
+                val dotColor = NeoColors.ElectricBlue.copy(alpha = 0.06f)
                 var x = spacing
                 while (x < size.width) {
                     var y = spacing
                     while (y < size.height) {
-                        drawCircle(dotColor, 1.5f, Offset(x, y))
+                        drawCircle(dotColor, 1.2f, Offset(x, y))
                         y += spacing
                     }
                     x += spacing
                 }
             }
 
-            // ── Element rendering ─────────────────────────────────────────────
-            // Each element is wrapped in key(el.id) so Compose tracks state
-            // correctly even when elements are added/removed/reordered.
+            // ── Elements ─────────────────────────────────────────────────────
             currentElements().forEach { el ->
                 key(el.id) {
-                    // Per-element size — never shared
                     val widthDp       = el.width.dp
                     val heightDp      = el.height.dp
                     val widthPx       = with(density) { widthDp.toPx() }
                     val heightPx      = with(density) { heightDp.toPx() }
-                    val visualWidthPx = widthPx  // width is now the actual visual width for all element types
+                    val visualWidthPx = widthPx
 
-                    // Local drag offset — initialised from stored fraction position
                     var offsetX by remember { mutableFloatStateOf((el.x * canvasWidthPx - visualWidthPx / 2).coerceAtLeast(0f)) }
                     var offsetY by remember { mutableFloatStateOf((el.y * canvasHeightPx - heightPx / 2).coerceAtLeast(0f)) }
 
-                    // Re-sync ONLY when canvas size changes (e.g. rotation).
-                    // NOT keyed on el.x/el.y — that would cause the LaunchedEffect to
-                    // fight with the drag handler on every frame, making drag heavy.
-                    // NOT keyed on el.width/el.height — slider would snap position.
                     LaunchedEffect(canvasWidthPx, canvasHeightPx) {
                         offsetX = ((el.x * canvasWidthPx) - visualWidthPx / 2).coerceAtLeast(0f)
                         offsetY = ((el.y * canvasHeightPx) - heightPx / 2).coerceAtLeast(0f)
@@ -255,14 +239,9 @@ fun ProfileEditorScreen(
                             .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                             .width(widthDp)
                             .height(heightDp)
-                            // FIX DRAG PERFORMANCE: update model only on drag END, not every frame.
-                            // FIX DRAG FLIES: pointerInput key includes el.width + el.height so the
-                            //   lambda always captures the CURRENT visualWidthPx / heightPx after a
-                            //   slider resize — prevents stale-closure position mismatch.
                             .pointerInput(el.id, el.width, el.height) {
                                 detectDragGestures(
                                     onDragEnd = {
-                                        // Write final position to model once, after drag finishes.
                                         val liveEl = pages.getOrNull(currentPage)
                                             ?.elements?.firstOrNull { e -> e.id == el.id }
                                             ?: return@detectDragGestures
@@ -274,7 +253,6 @@ fun ProfileEditorScreen(
                                         )
                                     },
                                     onDragCancel = {
-                                        // Snap back to last saved position on gesture cancel
                                         val liveEl = pages.getOrNull(currentPage)
                                             ?.elements?.firstOrNull { e -> e.id == el.id }
                                         if (liveEl != null) {
@@ -283,23 +261,18 @@ fun ProfileEditorScreen(
                                         }
                                     }
                                 ) { _, delta ->
-                                    // Only update local state — ZERO model writes here.
-                                    // This makes dragging buttery smooth (no recomposition per frame).
                                     offsetX = (offsetX + delta.x).coerceIn(0f, (canvasWidthPx - visualWidthPx).coerceAtLeast(0f))
                                     offsetY = (offsetY + delta.y).coerceIn(0f, (canvasHeightPx - heightPx).coerceAtLeast(0f))
                                 }
                             }
                     ) {
-                        CanvasElementWidget(
-                            element       = el,
-                            onSettingsTap = { settingsElement = el }
-                        )
+                        CanvasElementWidget(element = el, onSettingsTap = { settingsElement = el })
                     }
                 }
             }
         }
 
-        // ── PAGE INDICATOR (bottom-center) ────────────────────────────────────
+        // ── Page indicator ──────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -314,7 +287,7 @@ fun ProfileEditorScreen(
                     modifier = Modifier
                         .size(dotSize)
                         .background(
-                            if (isActive) ConsensiusColors.Accent else ConsensiusColors.TextSecondary,
+                            if (isActive) NeoColors.ElectricBlue else NeoColors.TextTertiary,
                             CircleShape
                         )
                         .pointerInput(index) {
@@ -324,7 +297,7 @@ fun ProfileEditorScreen(
             }
         }
 
-        // ── FAB cluster (bottom-right) ────────────────────────────────────────
+        // ── FAB cluster ─────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -371,7 +344,7 @@ fun ProfileEditorScreen(
 
             FloatingActionButton(
                 onClick        = { fabExpanded = !fabExpanded },
-                containerColor = ConsensiusColors.Accent,
+                containerColor = NeoColors.ElectricBlue,
                 contentColor   = Color.White,
                 shape          = CircleShape,
                 modifier       = Modifier.size(56.dp)
@@ -380,27 +353,22 @@ fun ProfileEditorScreen(
             }
         }
 
-        // ── TOP-RIGHT 3-DOT MENU — replaces the blocking full-width top bar ──
-        // Small semi-transparent pill so the entire canvas is usable for layout.
+        // ── Top-right menu ──────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 8.dp, end = 8.dp)
         ) {
-            // Semi-transparent profile name chip + ⋮ icon
             Row(
                 modifier = Modifier
-                    .background(
-                        ConsensiusColors.Card.copy(alpha = 0.75f),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .border(1.dp, ConsensiusColors.CardBorder.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                    .background(NeoColors.GlassCard, RoundedCornerShape(20.dp))
+                    .border(0.5.dp, NeoColors.GlassBorder, RoundedCornerShape(20.dp))
                     .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text       = profileName.take(16).ifBlank { "Untitled" },
-                    color      = ConsensiusColors.TextPrimary.copy(alpha = 0.85f),
+                    color      = NeoColors.TextPrimary.copy(alpha = 0.85f),
                     fontSize   = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1
@@ -421,75 +389,77 @@ fun ProfileEditorScreen(
             DropdownMenu(
                 expanded         = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
-                modifier         = Modifier.background(ConsensiusColors.Card)
+                modifier         = Modifier.background(NeoColors.GlassCard).border(0.5.dp, NeoColors.GlassBorder, RoundedCornerShape(12.dp))
             ) {
                 DropdownMenuItem(
-                    text    = { Text("✏  Edit profile name", color = ConsensiusColors.TextPrimary) },
+                    text    = { Text("Edit name", color = NeoColors.TextPrimary) },
                     onClick = { menuExpanded = false; showNameDialog = true }
                 )
-                HorizontalDivider(color = ConsensiusColors.CardBorder)
+                HorizontalDivider(color = NeoColors.Divider)
                 DropdownMenuItem(
-                    text    = { Text("💾  Save", color = ConsensiusColors.TextPrimary) },
+                    text    = { Text("Save", color = NeoColors.TextPrimary) },
                     onClick = { menuExpanded = false; saveProfile(profileName) }
                 )
                 DropdownMenuItem(
-                    text    = { Text("Save As…", color = ConsensiusColors.TextPrimary) },
+                    text    = { Text("Save As…", color = NeoColors.TextPrimary) },
                     onClick = { menuExpanded = false; saveAsName = profileName; showSaveAsDialog = true }
                 )
-                HorizontalDivider(color = ConsensiusColors.CardBorder)
+                HorizontalDivider(color = NeoColors.Divider)
                 DropdownMenuItem(
-                    text    = { Text("Exit without saving", color = ConsensiusColors.Error) },
+                    text    = { Text("Exit", color = NeoColors.Error) },
                     onClick = { menuExpanded = false; onNavigateBack() }
                 )
             }
         }
 
-        // ── Snackbar ──────────────────────────────────────────────────────────
         SnackbarHost(
             hostState = snackbarHostState,
             modifier  = Modifier.align(Alignment.BottomCenter)
         )
     }
 
-    // ── Edit Profile Name dialog ──────────────────────────────────────────────
+    // ── Name Dialog ─────────────────────────────────────────────────────────
     if (showNameDialog) {
         var nameInput by remember { mutableStateOf(profileName) }
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showNameDialog = false },
-            containerColor   = ConsensiusColors.Card,
+            containerColor   = NeoColors.GlassCard,
+            shape = RoundedCornerShape(20.dp),
             title = { Text("Profile Name", color = Color.White, fontWeight = FontWeight.Bold) },
             text  = {
                 OutlinedTextField(
                     value         = nameInput,
                     onValueChange = { nameInput = it },
                     singleLine    = true,
-                    placeholder   = { Text("e.g. My Layout", color = ConsensiusColors.TextSecondary) },
+                    shape = RoundedCornerShape(12.dp),
+                    placeholder   = { Text("e.g. My Layout", color = NeoColors.TextTertiary) },
                     colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor      = ConsensiusColors.Accent,
-                        unfocusedBorderColor    = ConsensiusColors.CardBorder,
+                        focusedBorderColor      = NeoColors.ElectricBlue,
+                        unfocusedBorderColor    = NeoColors.GlassBorder,
                         focusedTextColor        = Color.White,
                         unfocusedTextColor      = Color.White,
-                        cursorColor             = ConsensiusColors.Accent,
-                        focusedContainerColor   = ConsensiusColors.Surface,
-                        unfocusedContainerColor = ConsensiusColors.Surface
+                        cursorColor             = NeoColors.ElectricBlue,
+                        focusedContainerColor   = NeoColors.Surface,
+                        unfocusedContainerColor = NeoColors.Surface
                     )
                 )
             },
             confirmButton = {
                 Button(
                     onClick = { profileName = nameInput.ifBlank { "Untitled" }; showNameDialog = false },
-                    colors  = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
+                    shape = RoundedCornerShape(12.dp),
+                    colors  = ButtonDefaults.buttonColors(containerColor = NeoColors.ElectricBlue)
                 ) { Text("OK") }
             },
             dismissButton = {
                 TextButton(onClick = { showNameDialog = false }) {
-                    Text("CANCEL", color = ConsensiusColors.TextSecondary)
+                    Text("Cancel", color = NeoColors.TextSecondary)
                 }
             }
         )
     }
 
-    // ── Element settings bottom sheet ─────────────────────────────────────────
+    // ── Element Settings Sheet ──────────────────────────────────────────────
     val liveSettingsElement = settingsElement?.id?.let { id ->
         pages.getOrNull(currentPage)?.elements?.firstOrNull { it.id == id }
     }
@@ -497,14 +467,15 @@ fun ProfileEditorScreen(
         ModalBottomSheet(
             onDismissRequest = { settingsElement = null },
             sheetState       = sheetState,
-            containerColor   = ConsensiusColors.Card,
+            containerColor   = NeoColors.GlassCard,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = {
                 Box(
                     modifier = Modifier
-                        .padding(top = 8.dp, bottom = 4.dp)
-                        .width(40.dp)
+                        .padding(top = 10.dp, bottom = 6.dp)
+                        .width(36.dp)
                         .height(4.dp)
-                        .background(ConsensiusColors.CardBorder, CircleShape)
+                        .background(NeoColors.TextTertiary, CircleShape)
                 )
             }
         ) {
@@ -520,26 +491,28 @@ fun ProfileEditorScreen(
         }
     }
 
-    // ── Save As dialog ────────────────────────────────────────────────────────
+    // ── Save As Dialog ──────────────────────────────────────────────────────
     if (showSaveAsDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showSaveAsDialog = false },
-            containerColor   = ConsensiusColors.Card,
+            containerColor   = NeoColors.GlassCard,
+            shape = RoundedCornerShape(20.dp),
             title = { Text("Save As", color = Color.White, fontWeight = FontWeight.Bold) },
             text  = {
                 OutlinedTextField(
                     value         = saveAsName,
                     onValueChange = { saveAsName = it },
-                    label         = { Text("New profile name", color = ConsensiusColors.TextSecondary) },
+                    label         = { Text("New profile name", color = NeoColors.TextTertiary) },
                     singleLine    = true,
+                    shape = RoundedCornerShape(12.dp),
                     colors        = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor      = ConsensiusColors.Accent,
-                        unfocusedBorderColor    = ConsensiusColors.CardBorder,
+                        focusedBorderColor      = NeoColors.ElectricBlue,
+                        unfocusedBorderColor    = NeoColors.GlassBorder,
                         focusedTextColor        = Color.White,
                         unfocusedTextColor      = Color.White,
-                        cursorColor             = ConsensiusColors.Accent,
-                        focusedContainerColor   = ConsensiusColors.Surface,
-                        unfocusedContainerColor = ConsensiusColors.Surface
+                        cursorColor             = NeoColors.ElectricBlue,
+                        focusedContainerColor   = NeoColors.Surface,
+                        unfocusedContainerColor = NeoColors.Surface
                     )
                 )
             },
@@ -551,12 +524,13 @@ fun ProfileEditorScreen(
                         onNavigateBack()
                     },
                     enabled = saveAsName.isNotBlank(),
-                    colors  = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
-                ) { Text("SAVE") }
+                    shape = RoundedCornerShape(12.dp),
+                    colors  = ButtonDefaults.buttonColors(containerColor = NeoColors.ElectricBlue)
+                ) { Text("Save") }
             },
             dismissButton = {
                 TextButton(onClick = { showSaveAsDialog = false }) {
-                    Text("CANCEL", color = ConsensiusColors.TextSecondary)
+                    Text("Cancel", color = NeoColors.TextSecondary)
                 }
             }
         )
@@ -576,14 +550,14 @@ private fun FabSubItem(label: String, onClick: () -> Unit) {
             fontSize   = 12.sp,
             fontWeight = FontWeight.SemiBold,
             modifier   = Modifier
-                .shadow(4.dp, RoundedCornerShape(6.dp))
-                .background(ConsensiusColors.Card, RoundedCornerShape(6.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .shadow(4.dp, RoundedCornerShape(8.dp))
+                .background(NeoColors.GlassElevated, RoundedCornerShape(8.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         )
         SmallFloatingActionButton(
             onClick        = onClick,
-            containerColor = ConsensiusColors.AccentSecondary,
-            contentColor   = Color.Black,
+            containerColor = NeoColors.ElectricBlue,
+            contentColor   = Color.White,
             shape          = CircleShape,
             modifier       = Modifier.size(40.dp)
         ) {
@@ -610,8 +584,8 @@ private fun CanvasElementWidget(
                         .height(heightDp)
                         .shadow(6.dp, CircleShape)
                         .clip(CircleShape)
-                        .background(ConsensiusColors.Accent.copy(alpha = 0.18f))
-                        .border(1.5.dp, ConsensiusColors.Accent.copy(alpha = 0.7f), CircleShape),
+                        .background(NeoColors.ElectricBlue.copy(alpha = 0.12f))
+                        .border(1.5.dp, NeoColors.ElectricBlue.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     val labelSize = (minOf(widthDp, heightDp).value * 0.22f).sp
@@ -627,15 +601,15 @@ private fun CanvasElementWidget(
                         .size(sizeDp)
                         .shadow(6.dp, CircleShape)
                         .clip(CircleShape)
-                        .background(ConsensiusColors.Surface.copy(alpha = 0.8f))
-                        .border(1.5.dp, ConsensiusColors.AccentSecondary.copy(alpha = 0.6f), CircleShape),
+                        .background(NeoColors.Surface.copy(alpha = 0.8f))
+                        .border(1.5.dp, NeoColors.Cyan.copy(alpha = 0.4f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(modifier = Modifier.size(sizeDp * 0.38f)
-                        .background(ConsensiusColors.AccentSecondary.copy(alpha = 0.5f), CircleShape))
+                        .background(NeoColors.Cyan.copy(alpha = 0.4f), CircleShape))
                     Text(
                         text       = if (element.joystickConfig.type == JoystickType.SKILL_AIM) "AIM" else "MOV",
-                        color      = ConsensiusColors.AccentSecondary.copy(alpha = 0.8f),
+                        color      = NeoColors.Cyan.copy(alpha = 0.7f),
                         fontSize   = (sizeDp.value * 0.16f).sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -643,8 +617,8 @@ private fun CanvasElementWidget(
             }
 
             ElementType.DPAD -> {
-                val crossColor  = ConsensiusColors.TextSecondary.copy(alpha = 0.5f)
-                val borderColor = ConsensiusColors.Accent.copy(alpha = 0.5f)
+                val crossColor  = NeoColors.TextSecondary.copy(alpha = 0.4f)
+                val borderColor = NeoColors.ElectricBlue.copy(alpha = 0.4f)
                 Canvas(modifier = Modifier.width(widthDp).height(heightDp)) {
                     val w = size.width; val h = size.height
                     val arm = minOf(w, h) * 0.28f
@@ -662,35 +636,35 @@ private fun CanvasElementWidget(
                         .width(widthDp)
                         .height(heightDp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(ConsensiusColors.Surface.copy(alpha = 0.5f))
-                        .border(1.dp, ConsensiusColors.AccentSecondary.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                        .background(NeoColors.Surface.copy(alpha = 0.5f))
+                        .border(1.dp, NeoColors.Cyan.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("TOUCHPAD", color = ConsensiusColors.TextSecondary.copy(alpha = 0.6f), fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text("TOUCHPAD", color = NeoColors.TextTertiary.copy(alpha = 0.6f), fontSize = 9.sp, letterSpacing = 1.sp)
                         Text("${widthDp.value.roundToInt()}×${heightDp.value.roundToInt()}dp",
-                            color = ConsensiusColors.AccentSecondary.copy(alpha = 0.5f), fontSize = 10.sp)
+                            color = NeoColors.Cyan.copy(alpha = 0.4f), fontSize = 10.sp)
                     }
                 }
             }
         }
 
-        // ⚙ Gear icon
+        // ⚙ Settings gear
         IconButton(
             onClick  = onSettingsTap,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .size(20.dp)
+                .size(22.dp)
                 .offset(x = 6.dp, y = (-6).dp)
-                .background(ConsensiusColors.Card.copy(alpha = 0.85f), CircleShape)
+                .background(NeoColors.GlassCard.copy(alpha = 0.85f), CircleShape)
         ) {
             Icon(Icons.Default.Settings, contentDescription = "Settings",
-                tint = ConsensiusColors.Accent, modifier = Modifier.size(12.dp))
+                tint = NeoColors.ElectricBlue, modifier = Modifier.size(13.dp))
         }
     }
 }
 
-// ─── Element Settings Bottom Sheet ───────────────────────────────────────────
+// ─── Element Settings Sheet ──────────────────────────────────────────────────
 @Composable
 private fun ElementSettingsSheet(
     element: CanvasElement,
@@ -705,122 +679,119 @@ private fun ElementSettingsSheet(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Header row
         Row(
             modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically
         ) {
+            val headerMap = mapOf(
+                ElementType.BUTTON   to "Button Settings",
+                ElementType.JOYSTICK to "Joystick Settings",
+                ElementType.DPAD     to "D-Pad Settings",
+                ElementType.TOUCHPAD to "Touchpad Settings"
+            )
             Text(
-                text = when (element.type) {
-                    ElementType.BUTTON   -> "⬤  Button Settings"
-                    ElementType.JOYSTICK -> "◎  Joystick Settings"
-                    ElementType.DPAD     -> "✚  D-Pad Settings"
-                    ElementType.TOUCHPAD -> "▭  Touchpad Settings"
-                },
+                text = headerMap[element.type] ?: "Settings",
                 color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp
             )
             TextButton(onClick = onDelete) {
-                Text("DELETE", color = ConsensiusColors.Error, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Delete", color = NeoColors.Error, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
 
-        HorizontalDivider(color = ConsensiusColors.CardBorder)
+        HorizontalDivider(color = NeoColors.Divider)
 
-        // ── Size sliders ─────────────────────────────────────────────────────
-        // FIX SLIDER LAG: local state updates the slider visual INSTANTLY.
-        // onValueChangeFinished writes to the model ONCE when user lifts finger —
-        // this avoids triggering full recomposition on every slider pixel.
         when (element.type) {
             ElementType.JOYSTICK -> {
                 var size by remember(element.id) { mutableFloatStateOf(element.width) }
-                SheetLabel("Size: ${size.roundToInt()}dp")
+                SettingsLabel("Size: ${size.roundToInt()}dp")
                 Slider(
-                    value                 = size,
-                    onValueChange         = { size = it },
+                    value = size,
+                    onValueChange = { size = it },
                     onValueChangeFinished = { onUpdate(element.copy(width = size, height = size)) },
-                    valueRange            = 80f..300f,
+                    valueRange = 80f..300f,
                     colors = SliderDefaults.colors(
-                        thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                        thumbColor = NeoColors.ElectricBlue,
+                        activeTrackColor = NeoColors.ElectricBlue,
+                        inactiveTrackColor = NeoColors.GlassBorder
+                    )
                 )
             }
             ElementType.TOUCHPAD -> {
-                // Width and Height sliders for touchpad
                 var tpWidth  by remember(element.id) { mutableFloatStateOf(element.width) }
                 var tpHeight by remember(element.id) { mutableFloatStateOf(element.height) }
-
-                SheetLabel("Width: ${tpWidth.roundToInt()}dp")
+                SettingsLabel("Width: ${tpWidth.roundToInt()}dp")
                 Slider(
-                    value                 = tpWidth,
-                    onValueChange         = { tpWidth = it },
+                    value = tpWidth,
+                    onValueChange = { tpWidth = it },
                     onValueChangeFinished = { onUpdate(element.copy(width = tpWidth, height = tpHeight)) },
-                    valueRange            = 150f..700f,
+                    valueRange = 150f..700f,
                     colors = SliderDefaults.colors(
-                        thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                        thumbColor = NeoColors.ElectricBlue,
+                        activeTrackColor = NeoColors.ElectricBlue,
+                        inactiveTrackColor = NeoColors.GlassBorder
+                    )
                 )
-
-                SheetLabel("Height: ${tpHeight.roundToInt()}dp")
+                SettingsLabel("Height: ${tpHeight.roundToInt()}dp")
                 Slider(
-                    value                 = tpHeight,
-                    onValueChange         = { tpHeight = it },
+                    value = tpHeight,
+                    onValueChange = { tpHeight = it },
                     onValueChangeFinished = { onUpdate(element.copy(width = tpWidth, height = tpHeight)) },
-                    valueRange            = 60f..300f,
+                    valueRange = 60f..300f,
                     colors = SliderDefaults.colors(
-                        thumbColor       = ConsensiusColors.AccentSecondary,
-                        activeTrackColor = ConsensiusColors.AccentSecondary)
+                        thumbColor = NeoColors.Cyan,
+                        activeTrackColor = NeoColors.Cyan,
+                        inactiveTrackColor = NeoColors.GlassBorder
+                    )
                 )
             }
             else -> {
-                // BUTTON and DPAD — separate Width and Height sliders
                 var elWidth  by remember(element.id) { mutableFloatStateOf(element.width) }
                 var elHeight by remember(element.id) { mutableFloatStateOf(element.height) }
-
-                SheetLabel("Width: ${elWidth.roundToInt()}dp")
+                SettingsLabel("Width: ${elWidth.roundToInt()}dp")
                 Slider(
-                    value                 = elWidth,
-                    onValueChange         = { elWidth = it },
+                    value = elWidth,
+                    onValueChange = { elWidth = it },
                     onValueChangeFinished = { onUpdate(element.copy(width = elWidth, height = elHeight)) },
-                    valueRange            = 40f..300f,
+                    valueRange = 40f..300f,
                     colors = SliderDefaults.colors(
-                        thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                        thumbColor = NeoColors.ElectricBlue,
+                        activeTrackColor = NeoColors.ElectricBlue,
+                        inactiveTrackColor = NeoColors.GlassBorder
+                    )
                 )
-
-                SheetLabel("Height: ${elHeight.roundToInt()}dp")
+                SettingsLabel("Height: ${elHeight.roundToInt()}dp")
                 Slider(
-                    value                 = elHeight,
-                    onValueChange         = { elHeight = it },
+                    value = elHeight,
+                    onValueChange = { elHeight = it },
                     onValueChangeFinished = { onUpdate(element.copy(width = elWidth, height = elHeight)) },
-                    valueRange            = 40f..300f,
+                    valueRange = 40f..300f,
                     colors = SliderDefaults.colors(
-                        thumbColor       = ConsensiusColors.AccentSecondary,
-                        activeTrackColor = ConsensiusColors.AccentSecondary)
+                        thumbColor = NeoColors.Cyan,
+                        activeTrackColor = NeoColors.Cyan,
+                        inactiveTrackColor = NeoColors.GlassBorder
+                    )
                 )
             }
         }
 
-        HorizontalDivider(color = ConsensiusColors.CardBorder.copy(alpha = 0.5f))
+        HorizontalDivider(color = NeoColors.Divider.copy(alpha = 0.5f))
 
-        // ── Type-specific settings ────────────────────────────────────────────
         when (element.type) {
             ElementType.BUTTON -> {
                 var label by remember(element.id) { mutableStateOf(element.label) }
                 var key   by remember(element.id) { mutableStateOf(element.buttonConfig.key) }
-
-                SheetLabel("Label (max 4 chars)")
-                SheetTextField(label, { label = it.take(4); onUpdate(element.copy(label = label)) }, "e.g. S1")
-
-                SheetLabel("Key Mapping")
-                SheetTextField(key, { key = it; onUpdate(element.copy(buttonConfig = ButtonElementConfig(key))) }, "e.g. k, space, f1")
+                SettingsLabel("Label (max 4 chars)")
+                SettingsTextField(label, { label = it.take(4); onUpdate(element.copy(label = label)) }, "e.g. S1")
+                SettingsLabel("Key Mapping")
+                SettingsTextField(key, { key = it; onUpdate(element.copy(buttonConfig = ButtonElementConfig(key))) }, "e.g. k, space, f1")
             }
 
             ElementType.JOYSTICK -> {
                 var jsLabel by remember(element.id) { mutableStateOf(element.label) }
-                SheetLabel("Element Label (max 8)")
-                SheetTextField(jsLabel, {
-                    jsLabel = it.take(8); onUpdate(element.copy(label = jsLabel))
-                }, "e.g. MOVE, AIM")
-
-                SheetLabel("Joystick Type")
+                SettingsLabel("Element Label (max 8)")
+                SettingsTextField(jsLabel, { jsLabel = it.take(8); onUpdate(element.copy(label = jsLabel)) }, "e.g. MOVE, AIM")
+                SettingsLabel("Joystick Type")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     JoystickType.values().forEach { jsType ->
                         val selected = element.joystickConfig.type == jsType
@@ -830,88 +801,86 @@ private fun ElementSettingsSheet(
                                 onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(type = jsType), label = newLabel))
                                 jsLabel = newLabel
                             },
-                            shape  = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (selected) ConsensiusColors.Accent else ConsensiusColors.Surface),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected) NeoColors.ElectricBlue else NeoColors.Surface
+                            ),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(if (jsType == JoystickType.MOVEMENT) "Movement" else "Skill-Aim",
-                                color = if (selected) Color.White else ConsensiusColors.TextSecondary, fontSize = 12.sp)
+                            Text(
+                                if (jsType == JoystickType.MOVEMENT) "Movement" else "Skill-Aim",
+                                color = if (selected) Color.White else NeoColors.TextSecondary,
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }
-
                 if (element.joystickConfig.type == JoystickType.SKILL_AIM) {
                     var skillKey by remember(element.id) { mutableStateOf(element.joystickConfig.skillKey) }
-                    SheetLabel("Skill Key Mapping")
-                    SheetTextField(skillKey, {
-                        skillKey = it; onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(skillKey = it)))
-                    }, "e.g. k, q")
+                    SettingsLabel("Skill Key Mapping")
+                    SettingsTextField(skillKey, { skillKey = it; onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(skillKey = it))) }, "e.g. k, q")
                 }
             }
 
             ElementType.DPAD -> {
                 var dpadLabel by remember(element.id) { mutableStateOf(element.label) }
-                SheetLabel("Element Label (max 8)")
-                SheetTextField(dpadLabel, {
-                    dpadLabel = it.take(8); onUpdate(element.copy(label = dpadLabel))
-                }, "e.g. DPAD")
-
+                SettingsLabel("Element Label (max 8)")
+                SettingsTextField(dpadLabel, { dpadLabel = it.take(8); onUpdate(element.copy(label = dpadLabel)) }, "e.g. DPAD")
                 var upKey    by remember(element.id) { mutableStateOf(element.dpadConfig.upKey) }
                 var downKey  by remember(element.id) { mutableStateOf(element.dpadConfig.downKey) }
                 var leftKey  by remember(element.id) { mutableStateOf(element.dpadConfig.leftKey) }
                 var rightKey by remember(element.id) { mutableStateOf(element.dpadConfig.rightKey) }
-
-                SheetLabel("Key Mappings")
+                SettingsLabel("Key Mappings")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("Up", upKey) { upKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
+                        MiniKeyField("Up", upKey) { upKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("Down", downKey) { downKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
+                        MiniKeyField("Down", downKey) { downKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("Left", leftKey) { leftKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
+                        MiniKeyField("Left", leftKey) { leftKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                     Column(Modifier.weight(1f)) {
-                        SheetMiniKeyField("Right", rightKey) { rightKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
+                        MiniKeyField("Right", rightKey) { rightKey = it; onUpdate(element.copy(dpadConfig = DpadElementConfig(upKey, downKey, leftKey, rightKey))) }
                     }
                 }
             }
 
             ElementType.TOUCHPAD -> {
                 var tpLabel     by remember(element.id) { mutableStateOf(element.label) }
-                var sensitivity by remember(element.id) { mutableFloatStateOf(element.touchpadConfig.sensitivityMultiplier) }
+                var sens        by remember(element.id) { mutableFloatStateOf(element.touchpadConfig.sensitivityMultiplier) }
                 var lClick      by remember(element.id) { mutableStateOf(element.touchpadConfig.leftClickKey) }
                 var rClick      by remember(element.id) { mutableStateOf(element.touchpadConfig.rightClickKey) }
-
-                SheetLabel("Element Label (max 8)")
-                SheetTextField(tpLabel, { tpLabel = it.take(8); onUpdate(element.copy(label = tpLabel)) }, "e.g. MOUSE")
-
-                SheetLabel("Sensitivity x${String.format("%.1f", sensitivity)}")
+                SettingsLabel("Element Label (max 8)")
+                SettingsTextField(tpLabel, { tpLabel = it.take(8); onUpdate(element.copy(label = tpLabel)) }, "e.g. MOUSE")
+                SettingsLabel("Sensitivity x${String.format("%.1f", sens)}")
                 Slider(
-                    value                 = sensitivity,
-                    onValueChange         = { sensitivity = it },
-                    onValueChangeFinished = { onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, lClick, rClick))) },
-                    valueRange            = 0.5f..5.0f,
-                    colors = SliderDefaults.colors(thumbColor = ConsensiusColors.Accent, activeTrackColor = ConsensiusColors.Accent)
+                    value = sens,
+                    onValueChange = { sens = it },
+                    onValueChangeFinished = { onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sens, lClick, rClick))) },
+                    valueRange = 0.5f..5.0f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeoColors.ElectricBlue,
+                        activeTrackColor = NeoColors.ElectricBlue,
+                        inactiveTrackColor = NeoColors.GlassBorder
+                    )
                 )
-
-                SheetLabel("Left Click Key")
-                SheetTextField(lClick, { lClick = it; onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, it, rClick))) }, "e.g. mouse1")
-
-                SheetLabel("Right Click Key")
-                SheetTextField(rClick, { rClick = it; onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sensitivity, lClick, it))) }, "e.g. mouse2")
+                SettingsLabel("Left Click Key")
+                SettingsTextField(lClick, { lClick = it; onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sens, it, rClick))) }, "e.g. mouse1")
+                SettingsLabel("Right Click Key")
+                SettingsTextField(rClick, { rClick = it; onUpdate(element.copy(touchpadConfig = TouchpadElementConfig(sens, lClick, it))) }, "e.g. mouse2")
             }
         }
 
         Spacer(Modifier.height(4.dp))
         Button(
             onClick  = onDismiss,
-            modifier = Modifier.fillMaxWidth(),
-            shape    = RoundedCornerShape(10.dp),
-            colors   = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Accent)
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape    = RoundedCornerShape(14.dp),
+            colors   = ButtonDefaults.buttonColors(containerColor = NeoColors.ElectricBlue)
         ) {
-            Text("DONE", fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+            Text("Done", fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -919,45 +888,52 @@ private fun ElementSettingsSheet(
 
 // ─── Sheet helpers ─────────────────────────────────────────────────────────────
 @Composable
-private fun SheetLabel(text: String) {
-    Text(text = text, color = ConsensiusColors.Accent, fontSize = 10.sp,
-        fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+private fun SettingsLabel(text: String) {
+    Text(
+        text = text,
+        color = NeoColors.ElectricBlue,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp
+    )
 }
 
 @Composable
-private fun SheetTextField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+private fun SettingsTextField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
     OutlinedTextField(
         value         = value,
         onValueChange = onValueChange,
-        placeholder   = { Text(placeholder, color = ConsensiusColors.TextSecondary.copy(alpha = 0.6f), fontSize = 13.sp) },
+        placeholder   = { Text(placeholder, color = NeoColors.TextTertiary.copy(alpha = 0.6f), fontSize = 13.sp) },
         singleLine    = true,
         modifier      = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
         textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 14.sp, color = Color.White),
         colors        = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor      = ConsensiusColors.Accent,
-            unfocusedBorderColor    = ConsensiusColors.CardBorder,
-            focusedContainerColor   = ConsensiusColors.Surface,
-            unfocusedContainerColor = ConsensiusColors.Surface,
-            cursorColor             = ConsensiusColors.Accent
+            focusedBorderColor      = NeoColors.ElectricBlue,
+            unfocusedBorderColor    = NeoColors.GlassBorder,
+            focusedContainerColor   = NeoColors.Surface,
+            unfocusedContainerColor = NeoColors.Surface,
+            cursorColor             = NeoColors.ElectricBlue
         )
     )
 }
 
 @Composable
-private fun SheetMiniKeyField(label: String, value: String, onValueChange: (String) -> Unit) {
+private fun MiniKeyField(label: String, value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value         = value,
         onValueChange = { onValueChange(it.take(10)) },
-        label         = { Text(label, fontSize = 9.sp, color = ConsensiusColors.TextSecondary) },
+        label         = { Text(label, fontSize = 9.sp, color = NeoColors.TextTertiary) },
         singleLine    = true,
         modifier      = Modifier.fillMaxWidth().height(60.dp),
+        shape = RoundedCornerShape(12.dp),
         textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White),
         colors        = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor      = ConsensiusColors.Accent,
-            unfocusedBorderColor    = ConsensiusColors.CardBorder,
-            focusedContainerColor   = ConsensiusColors.Surface,
-            unfocusedContainerColor = ConsensiusColors.Surface,
-            cursorColor             = ConsensiusColors.Accent
+            focusedBorderColor      = NeoColors.ElectricBlue,
+            unfocusedBorderColor    = NeoColors.GlassBorder,
+            focusedContainerColor   = NeoColors.Surface,
+            unfocusedContainerColor = NeoColors.Surface,
+            cursorColor             = NeoColors.ElectricBlue
         )
     )
 }

@@ -49,18 +49,20 @@ MAX_LOG_LINES = 500
 class MonitorPage(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, fg_color=BG, **kwargs)
-        self._active_keys: Dict[str, str] = {}   # key â†’ type
+        self._active_keys: Dict[str, str] = {}   # key → type
         self._badge_widgets: Dict[str, ctk.CTkFrame] = {}
+        # Fix #2: Track last-rendered key set to skip unnecessary rebuilds
+        self._last_badge_keys: tuple = ()   # tuple of (key, type) pairs
         self._build()
 
-    # â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ──────────────────────────────────────────────────────────────────────────────────
 
     def _build(self):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self.grid_rowconfigure(2, weight=0)
 
-        # â”€â”€ Header bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Header bar ────────────────────────────────────────────────────────────────────
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 6))
         header.grid_columnconfigure(0, weight=1)
@@ -86,7 +88,7 @@ class MonitorPage(ctk.CTkFrame):
                          font=("Consolas", 9, "bold"),
                          text_color=color).pack(padx=6, pady=2)
 
-        # â”€â”€ Log area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Log area ──────────────────────────────────────────────────────────────────────
         log_frame = ctk.CTkFrame(self, fg_color=SURFACE, corner_radius=10,
                                  border_width=1, border_color=BORDER)
         log_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=4)
@@ -114,7 +116,7 @@ class MonitorPage(ctk.CTkFrame):
         self._log_text.tag_configure("ts", foreground=TEXT2)
         self._log_text.tag_configure("msg", foreground=TEXT)
 
-        # â”€â”€ Active keys section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # ── Active keys section ──────────────────────────────────────────────────────────
         keys_outer = ctk.CTkFrame(self, fg_color=CARD, corner_radius=10,
                                   border_width=1, border_color=BORDER)
         keys_outer.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 14))
@@ -127,26 +129,46 @@ class MonitorPage(ctk.CTkFrame):
         self._keys_frame = ctk.CTkFrame(keys_outer, fg_color="transparent")
         self._keys_frame.grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=6)
 
-    # â”€â”€ Public API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Public API ──────────────────────────────────────────────────────────────────
 
     def add_log(self, message: str, log_type: str = "system"):
-        """Thread-safe log entry â€” must be called via after() from bg thread."""
-        ts    = datetime.now().strftime("%H:%M:%S")
-        label = TYPE_LABELS.get(log_type, "SYSTEM ")
-        color_tag = f"type_{log_type}" if log_type in TYPE_COLORS else "type_system"
+        """Single-entry log — used for direct calls. Delegates to batch method."""
+        self.add_log_batch([(message, log_type)])
+
+    def add_log_batch(self, entries: list):
+        """Fix #3: Batch-insert multiple log entries into the Text widget in one pass.
+        
+        Instead of querying index(), inserting, and calling see('end') for every
+        single message (which was happening 60–200×/s), we:
+          1. Enable editing once
+          2. Trim excess lines once (if needed)
+          3. Build a buffer and insert all entries in one call
+          4. Call see('end') once at the end
+          5. Disable editing once
+        """
+        if not entries:
+            return
 
         self._log_text.configure(state="normal")
 
-        # Trim if too long
+        # Trim excess lines once before inserting the batch
         line_count = int(self._log_text.index("end-1c").split(".")[0])
-        if line_count > MAX_LOG_LINES:
-            self._log_text.delete("1.0", f"{line_count - MAX_LOG_LINES}.0")
+        new_total = line_count + len(entries)
+        if new_total > MAX_LOG_LINES:
+            excess = new_total - MAX_LOG_LINES
+            self._log_text.delete("1.0", f"{excess + 1}.0")
 
-        self._log_text.insert("end", f"[{ts}] ", "ts")
-        self._log_text.insert("end", f"{label}  ", color_tag)
-        self._log_text.insert("end", f"{message}\n", "msg")
+        # Insert all entries in one editing session
+        ts_now = datetime.now().strftime("%H:%M:%S")
+        for message, log_type in entries:
+            label     = TYPE_LABELS.get(log_type, "SYSTEM ")
+            color_tag = f"type_{log_type}" if log_type in TYPE_COLORS else "type_system"
+            self._log_text.insert("end", f"[{ts_now}] ", "ts")
+            self._log_text.insert("end", f"{label}  ", color_tag)
+            self._log_text.insert("end", f"{message}\n", "msg")
+
         self._log_text.configure(state="disabled")
-        self._log_text.see("end")
+        self._log_text.see("end")   # scroll once for the whole batch
 
     def clear_log(self):
         self._log_text.configure(state="normal")
@@ -154,7 +176,7 @@ class MonitorPage(ctk.CTkFrame):
         self._log_text.configure(state="disabled")
 
     def set_key_down(self, key: str, log_type: str = "button"):
-        """Mark a key as held â€” show badge."""
+        """Mark a key as held — show badge."""
         self._active_keys[key] = log_type
         self._rebuild_badges()
 
@@ -167,9 +189,18 @@ class MonitorPage(ctk.CTkFrame):
         self._active_keys.clear()
         self._rebuild_badges()
 
-    # â”€â”€ Internal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Internal ─────────────────────────────────────────────────────────────
 
     def _rebuild_badges(self):
+        # Fix #2: Skip rebuild if the key set hasn’t actually changed.
+        # When a button is held during rapid joystick spam, set_key_down/up can
+        # be called many times with the same state — this check prevents
+        # unnecessary destroy/recreate cycles.
+        current_snapshot = tuple(self._active_keys.items())
+        if current_snapshot == self._last_badge_keys:
+            return
+        self._last_badge_keys = current_snapshot
+
         for w in self._keys_frame.winfo_children():
             w.destroy()
         for i, (key, t) in enumerate(self._active_keys.items()):

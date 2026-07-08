@@ -15,23 +15,29 @@
           <theme>@style/Theme.ConsensiusController</theme>
         </config>
       </layout>
-      <layout url="file://$PROJECT_DIR$/src/main/res/mipmap-anydpi-v26/ic_launcher.xml">
-        <config>
-          <theme>@style/Theme.ConsensiusController</theme>
-        </config>
-      </layout>
-      <layout url="file://$PROJECT_DIR$/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml">
-        <config>
-          <theme>@style/Theme.ConsensiusController</theme>
-        </config>
-      </layout>
     </layouts>
   </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="dcac2c44-825b-46f9-9b5d-d1b863623f4b" name="Changes" comment="" />
+    <list default="true" id="dcac2c44-825b-46f9-9b5d-d1b863623f4b" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/Analysis-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/Analysis-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/ConsenciusServer.pkg" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/ConsenciusServer.pkg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/EXE-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/EXE-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/PKG-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/PKG-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/PYZ-00.pyz" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/PYZ-00.pyz" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/PYZ-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/PYZ-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/base_library.zip" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/base_library.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/warn-consensius_server.txt" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/warn-consensius_server.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/xref-consensius_server.html" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/build/consensius_server/xref-consensius_server.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/dist/ConsenciusServer.exe" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/dist/ConsenciusServer.exe" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/input/input_handler.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/input/input_handler.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/network/websocket_server.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/network/websocket_server.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/runtime/event_logger.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/runtime/event_logger.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/app_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/app_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../consensius-server/ui/monitor_page.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../consensius-server/ui/monitor_page.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -92,10 +98,15 @@
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/Dokumen/Controller projek/Consensius Controller/app&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Dokumen/Controller projek/Consensius Controller/app/src/main/res/drawable&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;project.propVCSSupport.DirectoryMappings&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\Dokumen\Controller projek\Consensius Controller\app\src\main\res\drawable" />
+    </key>
+  </component>
   <component name="RunManager">
     <configuration name="app" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
       <module name="ConsensiusController.app" />

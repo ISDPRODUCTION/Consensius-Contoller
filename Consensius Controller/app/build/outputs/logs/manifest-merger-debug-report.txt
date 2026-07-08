@@ -38,6 +38,7 @@ MERGED from [androidx.compose.ui:ui-util-android:1.7.6] C:\Users\MSI Thin\.gradl
 MERGED from [androidx.compose.ui:ui-text-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\411389220dd3aec47cb95ab457541872\transformed\ui-text-release\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\9e2dcb46d6612f9f91f50cc34279e4b9\transformed\ui-tooling-preview-release\AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.compose.ui:ui-graphics-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\28724f61dce166d4f97a15a4467727dc\transformed\ui-graphics-release\AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-icons-extended-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\120ac7226b43ba4522e83f047e03c555\transformed\material-icons-extended-release\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.compose.material:material-icons-core-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\6c144e22aecae4526d02e871742e0e41\transformed\material-icons-core-release\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.fragment:fragment:1.1.0] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\d6db2e33835a8285582f79a63d6fc31a\transformed\fragment-1.1.0\AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.loader:loader:1.0.0] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\1c9c704cbca35760b41f61a493137c08\transformed\loader-1.0.0\AndroidManifest.xml:17:1-22:12
@@ -273,6 +274,8 @@ MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.6] C:\Users\MSI 
 MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\9e2dcb46d6612f9f91f50cc34279e4b9\transformed\ui-tooling-preview-release\AndroidManifest.xml:20:5-44
 MERGED from [androidx.compose.ui:ui-graphics-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\28724f61dce166d4f97a15a4467727dc\transformed\ui-graphics-release\AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.ui:ui-graphics-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\28724f61dce166d4f97a15a4467727dc\transformed\ui-graphics-release\AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-extended-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\120ac7226b43ba4522e83f047e03c555\transformed\material-icons-extended-release\AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-extended-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\120ac7226b43ba4522e83f047e03c555\transformed\material-icons-extended-release\AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.material:material-icons-core-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\6c144e22aecae4526d02e871742e0e41\transformed\material-icons-core-release\AndroidManifest.xml:5:5-44
 MERGED from [androidx.compose.material:material-icons-core-android:1.7.6] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\6c144e22aecae4526d02e871742e0e41\transformed\material-icons-core-release\AndroidManifest.xml:5:5-44
 MERGED from [androidx.fragment:fragment:1.1.0] C:\Users\MSI Thin\.gradle\caches\8.9\transforms\d6db2e33835a8285582f79a63d6fc31a\transformed\fragment-1.1.0\AndroidManifest.xml:20:5-22:41

@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.consensius.controller.app-mergeDebugResources-60:/values-be/values-be.xml",
+            "outputFile": "com.consensius.controller.app-mergeDebugResources-61:/values-be/values-be.xml",
             "map": [
                 {
                     "source": "C:\\Users\\MSI Thin\\.gradle\\caches\\8.9\\transforms\\451969f1fe8eedbb4a67273a3a441a80\\transformed\\play-services-basement-18.1.0\\res\\values-be\\values.xml",

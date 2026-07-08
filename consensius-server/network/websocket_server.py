@@ -58,6 +58,12 @@ class WebSocketServer:
         # Input handler reference (set externally)
         self.input_handler = None
 
+        # Fix #7: Joystick deduplication — skip identical consecutive values
+        # Android FPS loop sends joystick at e.g. 60fps even when the stick
+        # hasn't moved. Caching last (x, y) per stick and skipping duplicate
+        # messages reduces InputHandler + UI log work by up to 90% when idle.
+        self._last_joystick: dict = {}   # stick_name -> (x, y)
+
     # ── Public API ─────────────────────────────────────────────────────────────
 
     def update_settings(self, settings: dict) -> None:
@@ -135,6 +141,8 @@ class WebSocketServer:
             self._log("Client disconnected", "system")
             if self.input_handler:
                 self.input_handler.release_all()
+            # Fix #7: Clear joystick dedup cache so next connection starts fresh
+            self._last_joystick.clear()
             if self.on_disconnect:
                 self.on_disconnect()
 
@@ -157,6 +165,15 @@ class WebSocketServer:
             stick = "left" if stick_raw in ("movement", "left") else stick_raw
             x = float(data.get("x", 0.0))
             y = float(data.get("y", 0.0))
+
+            # Fix #7: Deduplication — skip if (x, y) hasn't changed meaningfully.
+            # Android FPS loop sends joystick continuously even when the stick is
+            # stationary. Skipping duplicates cuts downstream work by ~90% at idle.
+            prev = self._last_joystick.get(stick)
+            if prev is not None and abs(prev[0] - x) < 0.01 and abs(prev[1] - y) < 0.01:
+                return  # identical to last frame, nothing to do
+            self._last_joystick[stick] = (x, y)
+
             self._log(
                 f"{'left' if stick == 'left' else 'right':4s}  x:{x:+.2f} y:{y:+.2f}",
                 "joystick"

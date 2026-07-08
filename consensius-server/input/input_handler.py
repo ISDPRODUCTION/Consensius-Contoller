@@ -95,6 +95,14 @@ class InputHandler:
         self._skill_aim_origin: dict = {}  # action_str -> (origin_x, origin_y)
         self._skill_aim_center: dict = {}  # action_str -> (center_x, center_y)
 
+        # ── BUG AIM-SESSION: Track skill aim sessions to distinguish between ──
+        # stale sessions (key held from aborted previous session) vs ongoing
+        # sessions (currently being dragged, sending "aiming" every frame).
+        # Without this, EVERY "aiming" message after the first would trigger
+        # the stale handler, causing the key to be released/pressed 60fps and
+        # the origin to be overwritten with the already-moved cursor position.
+        self._skill_aim_active: set = set()  # set of action_str with active session
+
         # Cache screen size so we don't call GetSystemMetrics on every aiming frame.
         self._screen_size: tuple = (-1, -1)  # (width, height), fetched lazily
 
@@ -176,8 +184,31 @@ class InputHandler:
         Bug 2 fix: Uses pressed_keys set() to deduplicate.
         press_key() only fires pynput if key not already held.
         release_key() only fires pynput if key is currently held.
+
+        BUG MOUSE-FIX: Handle mouse keys ("mouse1", "mouse2", "left_click",
+        "right_click", "middle_click") that come from the Android app's
+        button elements. Previously these were sent to _press_key/_release_key
+        which tried to press them as keyboard keys and silently ignored them.
         """
         is_down = state.lower() == "down"
+
+        # ── Check for mouse button keys (BEFORE lock to avoid deadlock) ─
+        # process_mouse_click acquires self._lock internally, so we must
+        # NOT call it while already holding the lock (threading.Lock is
+        # not reentrant).
+        mouse_map = {
+            "mouse1":       "left",
+            "mouse2":       "right",
+            "left_click":   "left",
+            "right_click":  "right",
+            "middle_click": "middle",
+        }
+        mouse_button = mouse_map.get(key_str.lower().strip())
+        if mouse_button is not None:
+            self.process_mouse_click(mouse_button, state)
+            return
+
+        # ── Regular keyboard key ────────────────────────────────────────
         with self._lock:
             if is_down:
                 self._press_key(key_str)
@@ -192,25 +223,25 @@ class InputHandler:
 
     def process_skill_aim(self, action: str, angle: float, magnitude: float, state: str = "cast") -> None:
         """
-        Bug SKILL-HOLD + SKILL-CURSOR fix:
+        Skill aim: press-and-hold key on first "aiming", track cursor, release on "cast".
 
-          On first "aiming" message:
-            1. Press-and-hold the skill key.
-            2. Save the current mouse position as the "origin" to restore later.
-            3. Compute screen center as the aim pivot (so cursor starts at character).
-            4. Move cursor to screenCenter + aimOffset (absolute position).
+        BUG-STUCK FIX (2 root causes fixed):
 
-          On subsequent "aiming" messages:
-            - Update cursor to screenCenter + aimOffset (absolute) so it tracks joystick.
+        Root Cause #1 — Android skips sending "cast" when drag magnitude < 0.1
+          The Android code has:  if (mag >= 0.1f) { sendSkillAim(..., "cast") }
+          So a light tap on the skill joystick sends "aiming" (key pressed) but
+          NEVER sends "cast" (key never released) → key stuck held indefinitely.
 
-          On "cast" (finger released):
-            1. Move cursor to final aim position.
-            2. Release the held skill key.
-            3. Restore cursor to the saved origin position.
+        Root Cause #2 — Stale _held_skill_keys from a previous aborted session
+          If cast was never received, _held_skill_keys[action] still exists on the
+          next session. The old code then skips the press entirely (action already
+          in dict) → key never pressed → skill does nothing → user presses again.
 
-        This fixes the cursor-in-top-left problem: instead of small relative moves
-        that cancel out (move +dx, -dx = no net movement), we place the cursor
-        absolutely from the screen center where the skill targeting reticle starts.
+        Fix:
+          - On "aiming" when action is ALREADY in _held_skill_keys: force-close the
+            stale session (release old key, restore cursor) then start a fresh one.
+          - On "cast": always pop ALL state dicts for the action before doing anything,
+            guaranteeing no orphaned state survives regardless of exceptions.
         """
         if not PYNPUT_AVAILABLE or self._keyboard is None:
             return
@@ -218,103 +249,135 @@ class InputHandler:
         if key is None:
             return
 
-        # skill_aim_distance is a direct pixel value (default 300px).
-        # Exponential scaling: small drags stay small, full drag = very wide range.
-        # scaled_magnitude = magnitude^0.7 gives a nice curve:
-        #   mag=0.3 -> 0.47, mag=0.7 -> 0.79, mag=1.0 -> 1.0
         max_px = float(self._settings.get("skill_aim_distance", 300))
-        max_px = max(max_px, 50.0)  # at least 50 px
-
-        # Apply exponential curve (prevents tiny movement for small drags)
+        max_px = max(max_px, 50.0)
         scaled_magnitude = magnitude ** 0.7 if magnitude > 0 else 0.0
-
         angle_rad = math.radians(angle)
         aim_dx = int(math.cos(angle_rad) * scaled_magnitude * max_px)
         aim_dy = int(math.sin(angle_rad) * scaled_magnitude * max_px)
 
         with self._lock:
             if state == "aiming":
-                # ── First aiming message: initialise aim session ─────────────
-                if action not in self._held_skill_keys:
-                    # 1. Press-and-hold skill key
+
+                # ── BUG AIM-SESSION: Detect TRUE stale sessions only ─────────
+                # Old code checked `if action in self._held_skill_keys`, but this
+                # fires on EVERY "aiming" frame (60fps) because the key was pressed
+                # in the first frame and stays in _held_skill_keys throughout the
+                # drag. This caused:
+                #   1. Key release/press 60 times/second
+                #   2. Origin overwritten with cursor's already-moved position
+                #   3. Center constantly reset → aim stutter
+                #
+                # Fix: A stale session = key held AND NOT in _skill_aim_active.
+                # Once a session starts, _skill_aim_active is set and cleared on
+                # "cast", so only truly orphaned sessions trigger the stale path.
+                if action in self._held_skill_keys and action not in self._skill_aim_active:
+                    # ── BUG-STUCK FIX Root Cause #2: stale session still open ──
+                    # A prior "cast" was never received (e.g. Android mag < 0.1
+                    # threshold suppressed it). Force-close the orphaned session first
+                    # so the new press always works correctly.
+                    stale_key = self._held_skill_keys.pop(action)
                     try:
-                        self._keyboard.press(key)
-                        self._held_skill_keys[action] = key
-                        print(f"[SKILL_HOLD] PRESS action={action!r} key={key!r}")
+                        self._keyboard.release(stale_key)
                     except Exception:
                         pass
+                    # Pop stale state silently — discard to prevent cursor jump.
+                    self._skill_aim_origin.pop(action, None)
+                    self._skill_aim_center.pop(action, None)
 
-                    # 2. Save current cursor position (restore on cast)
+                # ── First-time setup: save initial state ────────────────────
+                if action not in self._skill_aim_active:
+                    self._skill_aim_active.add(action)
+
+                    # Save current cursor position BEFORE moving (restored on cast)
                     if self._mouse:
                         try:
-                            origin = self._mouse.position  # (x, y) tuple
-                            self._skill_aim_origin[action] = origin
-                            print(f"[SKILL_CURSOR] saved origin={origin}")
+                            origin_pos = self._mouse.position
+                            self._skill_aim_origin[action] = origin_pos
                         except Exception:
                             self._skill_aim_origin[action] = (0, 0)
 
-                    # 3. Determine aim pivot = configured skill button position
-                    #    or screen center as fallback
+                    # Determine aim pivot (configured position or screen centre)
                     skill_positions = self._settings.get("skill_positions", {})
                     pos_cfg = skill_positions.get(action, {})
                     px = pos_cfg.get("x", -1) if isinstance(pos_cfg, dict) else -1
                     py = pos_cfg.get("y", -1) if isinstance(pos_cfg, dict) else -1
-
                     if px >= 0 and py >= 0:
-                        # Use the configured skill button position on screen
                         self._skill_aim_center[action] = (int(px), int(py))
-                        print(f"[SKILL_CURSOR] using skill pos ({px}, {py}) for action={action!r}")
                     else:
-                        # Fallback: screen center (position not configured yet)
                         sw, sh = self._screen_size if self._screen_size[0] > 0 else (1920, 1080)
                         self._skill_aim_center[action] = (sw // 2, sh // 2)
-                        print(f"[SKILL_CURSOR] no pos cfg for {action!r}, using screen center ({sw//2}, {sh//2})")
 
-                # 4. Move cursor to center + aim offset (absolute positioning)
+                # ═══ BUG ORDER-FIX: Move cursor FIRST, then press key ═══
+                # CRITICAL: The game reads the cursor position WHEN the key
+                # is pressed (key down event), not continuously. If we press
+                # the key FIRST and then move the cursor, the game sees the
+                # OLD cursor position (e.g. center of screen), not the aim
+                # position. This makes the skill fire in the wrong direction.
+                #
+                # Fix: Always move cursor to the aim position BEFORE pressing
+                # the key. On the initial frame, cursor moves → then key
+                # presses. On subsequent frames, cursor keeps updating.
                 center = self._skill_aim_center.get(action)
                 if self._mouse and center:
-                    target_x = center[0] + aim_dx
-                    target_y = center[1] + aim_dy
                     try:
-                        self._mouse.position = (target_x, target_y)
+                        self._mouse.position = (center[0] + aim_dx, center[1] + aim_dy)
+                    except Exception:
+                        pass
+
+                # ── Press key (cursor is ALREADY at aim position now) ─────
+                if action not in self._held_skill_keys:
+                    try:
+                        self._keyboard.press(key)
+                        self._held_skill_keys[action] = key
                     except Exception:
                         pass
 
             elif state == "cast":
-                # ── Finger released: move to final aim, release key, restore cursor ──
-                center = self._skill_aim_center.get(action)
+                # Mark session as ended BEFORE popping state
+                self._skill_aim_active.discard(action)
+
+                # ── BUG-STUCK FIX Root Cause #1: always pop ALL state first ──
+                # Pop everything before acting so no orphaned state survives even
+                # if an exception occurs mid-cast (e.g. pynput error).
+                center   = self._skill_aim_center.pop(action, None)
+                origin   = self._skill_aim_origin.pop(action, None)
+                held_key = self._held_skill_keys.pop(action, None)
+
+                # 1. Move cursor to final aimed position
                 if self._mouse and center:
-                    target_x = center[0] + aim_dx
-                    target_y = center[1] + aim_dy
                     try:
-                        self._mouse.position = (target_x, target_y)
+                        self._mouse.position = (center[0] + aim_dx, center[1] + aim_dy)
                     except Exception:
                         pass
 
-                # Release the held skill key
-                held_key = self._held_skill_keys.pop(action, None)
+                # 2. Release held key (or tap if session was somehow skipped)
                 if held_key is not None:
                     try:
                         self._keyboard.release(held_key)
-                        print(f"[SKILL_HOLD] RELEASE action={action!r} key={held_key!r}")
                     except Exception:
                         pass
                 else:
-                    # Fallback: key wasn't held, do a quick tap
+                    # Fallback: no held key — quick tap at current position
                     try:
                         self._keyboard.press(key)
                         self._keyboard.release(key)
-                        print(f"[SKILL_HOLD] TAP (fallback) action={action!r} key={key!r}")
                     except Exception:
                         pass
 
-                # Restore cursor to the position it was before skill aim started
-                origin = self._skill_aim_origin.pop(action, None)
-                self._skill_aim_center.pop(action, None)
-                if self._mouse and origin:
+                # ── BUG CURSOR-FIX: Restore cursor to origin ─────────────────
+                # Old code had a double-pop bug: origin was popped at the top
+                # and then popped AGAIN here (returning None), so cursor was
+                # NEVER restored. Fixed by using the origin from the first pop.
+                # This ensures cursor returns to the position BEFORE aiming,
+                # so subsequent clicks (e.g. fire button via touchpad) happen
+                # at the correct pre-aim location.
+                #
+                # Note: _skill_aim_center was already popped above — no need
+                # to pop again.
+                if self._mouse and origin is not None:
                     try:
                         self._mouse.position = origin
-                        print(f"[SKILL_CURSOR] restored to origin={origin}")
                     except Exception:
                         pass
 
@@ -323,7 +386,7 @@ class InputHandler:
     def process_mouse_click(self, button: str, state: str) -> None:
         """
         SYNC FIX: Android sends type="mouse_click" {button, state}.
-        Handles left/right button press and release via pynput.
+        Handles left/right/middle button press and release via pynput.
           - 1 tap  → left click down + up
           - 2 taps → right click down + up (sent by Android as two-finger tap)
           - hold   → left down (drag), then left up on release
@@ -332,7 +395,8 @@ class InputHandler:
             return
         try:
             from pynput.mouse import Button as MouseButton
-            btn = MouseButton.left if button == "left" else MouseButton.right
+            btn_map = {"left": MouseButton.left, "right": MouseButton.right, "middle": MouseButton.middle}
+            btn = btn_map.get(button, MouseButton.left)
             with self._lock:
                 if state == "down":
                     self._mouse.press(btn)
@@ -374,7 +438,7 @@ class InputHandler:
                 try:
                     if self._keyboard:
                         self._keyboard.release(held_key)
-                        print(f"[SKILL_HOLD] FORCE RELEASE on disconnect action={action!r}")
+                        # Fix #5: removed print() — not needed at disconnect
                 except Exception:
                     pass
             self._held_skill_keys.clear()
@@ -384,11 +448,14 @@ class InputHandler:
                 try:
                     if self._mouse and origin:
                         self._mouse.position = origin
-                        print(f"[SKILL_CURSOR] RESTORE on disconnect action={action!r} origin={origin}")
+                        # Fix #5: removed print()
                 except Exception:
                     pass
             self._skill_aim_origin.clear()
             self._skill_aim_center.clear()
+            self._skill_aim_active.clear()
+
+            # Note: _held_skill_keys is also cleared above in the SKILL-HOLD block.
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

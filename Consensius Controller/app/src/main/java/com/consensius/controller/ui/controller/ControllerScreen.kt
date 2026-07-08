@@ -4,8 +4,8 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.view.MotionEvent
-import android.view.WindowManager
 import android.view.WindowInsetsController
+import android.view.WindowManager
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -20,13 +20,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +52,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -73,7 +74,7 @@ import com.consensius.controller.model.ControllerProfile
 import com.consensius.controller.model.ElementType
 import com.consensius.controller.model.JoystickType
 import com.consensius.controller.network.WebSocketManager
-import com.consensius.controller.ui.theme.ConsensiusColors
+import com.consensius.controller.ui.theme.NeoColors
 import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -83,29 +84,25 @@ import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.milliseconds
 
 // ─── Per-element runtime state ─────────────────────────────────────────────────
-
-/** Mutable runtime state for a single canvas element */
 data class ElementRuntimeState(
     val isPressed:       Boolean = false,
     val joystickOffX:    Float   = 0f,
     val joystickOffY:    Float   = 0f,
-    val activeDpadDir:   String? = null,   // "up"/"down"/"left"/"right"
+    val activeDpadDir:   String? = null,
     val lastTouchX:      Float   = 0f,
     val lastTouchY:      Float   = 0f,
-    // ── Touchpad gesture fields ──
-    val touchDownTime:   Long    = 0L,     // System.currentTimeMillis() when finger touched
-    val touchDownX:      Float   = 0f,     // raw X at first touch
-    val touchDownY:      Float   = 0f,     // raw Y at first touch
-    val touchMoved:      Boolean = false,  // true if finger drifted > drag threshold
-    val isLongPressed:   Boolean = false,  // true while long-press click-drag is active
-    val pointer2Id:      Int     = -1,     // second pointer ID on the touchpad
-    val pointer2X:       Float   = 0f,     // second pointer last X
-    val pointer2Y:       Float   = 0f,     // second pointer last Y
-    val twoFingerDown:   Boolean = false,  // true while 2 fingers are on this touchpad
-    val lastTapTime:     Long    = 0L,     // time of last tap-UP (for double-tap detection)
-    val isDoubleTapDrag: Boolean = false,  // true while double-tap-drag (scroll/drag) is active
-    // ── Two-finger scroll state ──
-    val twoFingerScrollActive: Boolean = false  // true once two-finger drag starts scrolling
+    val touchDownTime:   Long    = 0L,
+    val touchDownX:      Float   = 0f,
+    val touchDownY:      Float   = 0f,
+    val touchMoved:      Boolean = false,
+    val isLongPressed:   Boolean = false,
+    val pointer2Id:      Int     = -1,
+    val pointer2X:       Float   = 0f,
+    val pointer2Y:       Float   = 0f,
+    val twoFingerDown:   Boolean = false,
+    val lastTapTime:     Long    = 0L,
+    val isDoubleTapDrag: Boolean = false,
+    val twoFingerScrollActive: Boolean = false
 )
 
 // ─── ControllerScreen ─────────────────────────────────────────────────────────
@@ -127,7 +124,6 @@ fun ControllerScreen(
         val origOrientation = activity?.requestedOrientation
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // Full immersive mode (API 30+ uses WindowInsetsController)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             activity?.window?.insetsController?.let { controller ->
                 controller.hide(
@@ -188,14 +184,8 @@ fun ControllerScreen(
 
     // ── Element runtime states ────────────────────────────────────────────────
     val elementStates = remember { mutableStateMapOf<String, ElementRuntimeState>() }
-
-    // Element bounding boxes in root coords (px) for hit testing
     val elementBounds = remember { mutableStateMapOf<String, android.graphics.RectF>() }
-
-    // Touchpad actual rendered bounds — same as elementBounds now that 2.5× factor is gone
     val touchpadActualBounds = remember { mutableStateMapOf<String, android.graphics.RectF>() }
-
-    // ── Pointer → element mapping ─────────────────────────────────────────────
     val pointerToElement = remember { mutableStateMapOf<Int, String>() }
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
@@ -251,7 +241,6 @@ fun ControllerScreen(
     }
 
     fun sendMouseMove(dx: Float, dy: Float) {
-        // type = "mouse_move" so the server can distinguish it from mouse_click/scroll
         webSocketManager.send(gson.toJson(mapOf(
             "type" to "mouse_move",
             "dx"   to (dx * mouseSensitivity),
@@ -274,12 +263,11 @@ fun ControllerScreen(
         )))
     }
 
-    // ── FPS loop for continuous joystick send ──────────────────────────────────
+    // ── FPS loop ─────────────────────────────────────────────────────────────
     LaunchedEffect(fps) {
         val intervalMs = (1000f / fps.coerceIn(1, 120)).toLong()
         while (true) {
             delay(intervalMs.milliseconds)
-            // BUG FIX: try-catch so any exception never kills this coroutine.
             try {
                 val currentElements = activeProfile?.pages?.getOrNull(currentPage)?.elements
                     ?: continue
@@ -297,7 +285,6 @@ fun ControllerScreen(
                         if (maxR > 0f) {
                             val rawNx = state.joystickOffX / maxR
                             val rawNy = state.joystickOffY / maxR
-                            // Guard against NaN/Infinity before sending
                             if (rawNx.isFinite() && rawNy.isFinite()) {
                                 sendJoystick(
                                     rawNx.coerceIn(-1f, 1f),
@@ -314,35 +301,28 @@ fun ControllerScreen(
 
     // ── Pointer event dispatcher ───────────────────────────────────────────────
     fun findElementAt(rawX: Float, rawY: Float, elements: List<CanvasElement>): CanvasElement? {
-        for (el in elements.reversed()) { // top elements first
+        for (el in elements.reversed()) {
             val rect = elementBounds[el.id] ?: continue
             if (rect.contains(rawX, rawY)) return el
         }
         return null
     }
 
-    // Touchpad drag threshold in pixels
     val touchpadDragThresholdPx = 10f
-    // Long-press threshold in milliseconds
     val longPressMs = 500L
-    // Single-tap max hold duration — generous so a normal tap always qualifies
     val tapMaxMs = 400L
-    // Double-tap window — time from tap-1-UP to tap-2-UP must be within this
     val doubleTapMs = 420L
 
     fun onPointerDown(pointerId: Int, rawX: Float, rawY: Float) {
         val page = activeProfile?.pages?.getOrNull(currentPage) ?: return
         val el = findElementAt(rawX, rawY, page.elements) ?: return
         pointerToElement[pointerId] = el.id
-
         when (el.type) {
             ElementType.BUTTON -> {
                 elementStates[el.id] = ElementRuntimeState(isPressed = true)
                 sendButton(el.buttonConfig.key, true)
             }
             ElementType.JOYSTICK -> {
-                // BUG 5 FIX: Do NOT press skill key on pointer down.
-                // For SKILL_AIM: only send "aiming" while dragging, "cast" on release.
                 elementStates[el.id] = ElementRuntimeState(
                     isPressed    = true,
                     joystickOffX = 0f,
@@ -372,56 +352,45 @@ fun ControllerScreen(
             ElementType.TOUCHPAD -> {
                 val existing = elementStates[el.id]
                 val now = System.currentTimeMillis()
-                if (existing != null && existing.twoFingerDown) {
-                    // Third+ finger ignored
-                    return
-                }
+                if (existing != null && existing.twoFingerDown) return
                 if (existing != null && existing.isPressed && existing.pointer2Id == -1) {
-                    // Second finger arriving on the touchpad → two-finger gesture
                     elementStates[el.id] = existing.copy(
-                        pointer2Id             = pointerId,
-                        pointer2X              = rawX,
-                        pointer2Y              = rawY,
-                        twoFingerDown          = true,
-                        twoFingerScrollActive  = false   // reset scroll flag
+                        pointer2Id   = pointerId,
+                        pointer2X    = rawX,
+                        pointer2Y    = rawY,
+                        twoFingerDown = true,
+                        twoFingerScrollActive = false
                     )
                 } else {
-                    // First finger down — check if this is the second tap of a double-tap.
                     val timeSinceLastTap = now - (existing?.lastTapTime ?: 0L)
-                    val isSecondTap = (existing?.lastTapTime ?: 0L) > 0L &&
-                            timeSinceLastTap < doubleTapMs
-
+                    val isSecondTap = (existing?.lastTapTime ?: 0L) > 0L && timeSinceLastTap < doubleTapMs
                     if (isSecondTap) {
-                        // ── DOUBLE-TAP DRAG START ──────────────────────────────
-                        // Finger came down again within the double-tap window.
-                        // Hold left mouse button down — user can now drag to scroll.
                         sendMouseClick("left", true)
                         elementStates[el.id] = ElementRuntimeState(
-                            isPressed        = true,
-                            lastTouchX       = rawX,
-                            lastTouchY       = rawY,
-                            touchDownTime    = now,
-                            touchDownX       = rawX,
-                            touchDownY       = rawY,
-                            touchMoved       = false,
-                            isDoubleTapDrag  = true,
-                            lastTapTime      = 0L   // reset so next gesture starts fresh
+                            isPressed       = true,
+                            lastTouchX      = rawX,
+                            lastTouchY      = rawY,
+                            touchDownTime   = now,
+                            touchDownX      = rawX,
+                            touchDownY      = rawY,
+                            touchMoved      = false,
+                            isDoubleTapDrag = true,
+                            lastTapTime     = 0L
                         )
                     } else {
-                        // Normal first tap — start tracking
                         elementStates[el.id] = ElementRuntimeState(
-                            isPressed             = true,
-                            lastTouchX            = rawX,
-                            lastTouchY            = rawY,
-                            touchDownTime         = now,
-                            touchDownX            = rawX,
-                            touchDownY            = rawY,
-                            touchMoved            = false,
-                            isLongPressed         = false,
-                            pointer2Id            = -1,
-                            twoFingerDown         = false,
+                            isPressed    = true,
+                            lastTouchX   = rawX,
+                            lastTouchY   = rawY,
+                            touchDownTime = now,
+                            touchDownX   = rawX,
+                            touchDownY   = rawY,
+                            touchMoved   = false,
+                            isLongPressed = false,
+                            pointer2Id   = -1,
+                            twoFingerDown = false,
                             twoFingerScrollActive = false,
-                            lastTapTime           = existing?.lastTapTime ?: 0L
+                            lastTapTime  = existing?.lastTapTime ?: 0L
                         )
                     }
                 }
@@ -434,120 +403,69 @@ fun ControllerScreen(
         val page = activeProfile?.pages?.getOrNull(currentPage) ?: return
         val el = page.elements.firstOrNull { it.id == elId } ?: return
         val state = elementStates[elId] ?: return
-
         when (el.type) {
             ElementType.JOYSTICK -> {
-                // FIX: Use elementBounds if available, otherwise fall back to the
-                // initial touch position (lastTouchX/lastTouchY) as the joystick center.
-                // This prevents onPointerMove from silently returning when bounds are
-                // not yet measured, which caused joystickOffX/Y to stay 0 forever.
                 val rect = elementBounds[elId]
-                val cx: Float
-                val cy: Float
-                val maxR: Float
+                val cx: Float; val cy: Float; val maxR: Float
                 if (rect != null && rect.width() > 0f) {
                     cx   = rect.centerX()
                     cy   = rect.centerY()
                     maxR = rect.width() * 0.4f
                 } else {
-                    // Fallback: treat initial touch as joystick center (floating mode)
                     cx   = state.lastTouchX
                     cy   = state.lastTouchY
                     maxR = with(density) { el.width.dp.toPx() * 0.4f }.coerceAtLeast(50f)
                 }
-
-                val rawDx    = rawX - cx
-                val rawDy    = rawY - cy
-                val dist     = sqrt(rawDx * rawDx + rawDy * rawDy)
+                val rawDx = rawX - cx
+                val rawDy = rawY - cy
+                val dist = sqrt(rawDx * rawDx + rawDy * rawDy)
                 val clampedX = if (dist <= maxR) rawDx else rawDx / dist * maxR
                 val clampedY = if (dist <= maxR) rawDy else rawDy / dist * maxR
                 elementStates[elId] = state.copy(joystickOffX = clampedX, joystickOffY = clampedY)
-
                 if (el.joystickConfig.type == JoystickType.SKILL_AIM && maxR > 0f) {
-                    // Skill aim: send aiming direction on every move (user-paced, safe rate).
-                    val nx       = (clampedX / maxR).coerceIn(-1f, 1f)
-                    // Note: screen Y is inverted (down = positive), so negate for game coordinates
-                    val ny       = -(clampedY / maxR).coerceIn(-1f, 1f)
-                    // arcTan2(dy, dx) — use raw screen offsets so angle matches screen direction
-                    // clampedX right = positive angle 0 deg, up (negative screen Y) = 90 deg
-                    val angleDeg = Math.toDegrees(
-                        atan2(clampedY.toDouble(), clampedX.toDouble())
-                    ).toFloat()  // screen-space angle, clampedY not negated
+                    val nx = (clampedX / maxR).coerceIn(-1f, 1f)
+                    val ny = -(clampedY / maxR).coerceIn(-1f, 1f)
+                    val angleDeg = Math.toDegrees(atan2(clampedY.toDouble(), clampedX.toDouble())).toFloat()
                     val magnitude = sqrt(nx * nx + ny * ny).coerceIn(0f, 1f)
                     sendSkillAim(el.joystickConfig.skillKey, angleDeg, magnitude, "aiming")
                 }
-                // Movement joystick: state is updated above; FPS loop reads it and sends
-                // at the configured rate. Do NOT call sendJoystick() here — calling send()
-                // on every touch event (potentially 200+/s) overflows OkHttp's WebSocket
-                // send buffer → IOException → "no close frame" disconnect.
             }
             ElementType.TOUCHPAD -> {
-                // Distinguish two-finger scroll vs single-finger move
                 if (state.twoFingerDown) {
-                    // ── Two-finger gesture: 2-finger drag = scroll ────────────
                     if (pointerId == state.pointer2Id) {
                         val dy2 = rawY - state.pointer2Y
-                        // Scroll on any vertical movement > 1px (horizontal delta unused for scroll)
                         if (kotlin.math.abs(dy2) > 1f) {
-                            val normalizedDy = -(dy2 / 15f) // positive = scroll up
+                            val normalizedDy = -(dy2 / 15f)
                             sendMouseScroll(normalizedDy)
-                            elementStates[elId] = state.copy(
-                                pointer2X = rawX,
-                                pointer2Y = rawY,
-                                twoFingerScrollActive = true
-                            )
+                            elementStates[elId] = state.copy(pointer2X = rawX, pointer2Y = rawY, twoFingerScrollActive = true)
                         } else {
                             elementStates[elId] = state.copy(pointer2X = rawX, pointer2Y = rawY)
                         }
                     } else {
-                        // First pointer moved during two-finger: update position
                         elementStates[elId] = state.copy(lastTouchX = rawX, lastTouchY = rawY)
                     }
                 } else {
-                    // ── Single-finger: mouse move / double-tap drag ─────────────
                     if (state.isDoubleTapDrag) {
-                        // Double-tap drag active: every movement = mouse move
-                        // (left button is already held down from onPointerDown)
                         val dx = rawX - state.lastTouchX
                         val dy = rawY - state.lastTouchY
-                        if (dx != 0f || dy != 0f) {
-                            sendMouseMove(dx, dy)
-                        }
-                        elementStates[elId] = state.copy(
-                            lastTouchX = rawX,
-                            lastTouchY = rawY,
-                            touchMoved = true
-                        )
+                        if (dx != 0f || dy != 0f) sendMouseMove(dx, dy)
+                        elementStates[elId] = state.copy(lastTouchX = rawX, lastTouchY = rawY, touchMoved = true)
                         return
                     }
                     val totalDx = rawX - state.touchDownX
                     val totalDy = rawY - state.touchDownY
                     val totalDist = sqrt(totalDx * totalDx + totalDy * totalDy)
                     val moved = state.touchMoved || totalDist > touchpadDragThresholdPx
-
                     if (moved) {
-                        // Check long-press: if held > LONG_PRESS_MS → begin click-drag
                         val now = System.currentTimeMillis()
                         val heldMs = now - state.touchDownTime
-                        val longPressed = state.isLongPressed ||
-                            (!state.touchMoved && heldMs >= longPressMs)
-
-                        if (longPressed && !state.isLongPressed) {
-                            // Finger just crossed long-press → begin held left click
-                            sendMouseClick("left", true)
-                        }
-
+                        val longPressed = state.isLongPressed || (!state.touchMoved && heldMs >= longPressMs)
+                        if (longPressed && !state.isLongPressed) sendMouseClick("left", true)
                         val dx = rawX - state.lastTouchX
                         val dy = rawY - state.lastTouchY
                         sendMouseMove(dx, dy)
-                        elementStates[elId] = state.copy(
-                            lastTouchX    = rawX,
-                            lastTouchY    = rawY,
-                            touchMoved    = true,
-                            isLongPressed = longPressed
-                        )
+                        elementStates[elId] = state.copy(lastTouchX = rawX, lastTouchY = rawY, touchMoved = true, isLongPressed = longPressed)
                     } else {
-                        // Not yet moved — update position but don't move mouse
                         elementStates[elId] = state.copy(lastTouchX = rawX, lastTouchY = rawY)
                     }
                 }
@@ -581,7 +499,7 @@ fun ControllerScreen(
                     elementStates[elId] = state.copy(activeDpadDir = newDir)
                 }
             }
-            ElementType.BUTTON -> { /* handled on down/up only */ }
+            ElementType.BUTTON -> { }
         }
     }
 
@@ -590,7 +508,6 @@ fun ControllerScreen(
         val page = activeProfile?.pages?.getOrNull(currentPage) ?: return
         val el = page.elements.firstOrNull { it.id == elId } ?: return
         val state = elementStates[elId] ?: return
-
         when (el.type) {
             ElementType.BUTTON -> {
                 elementStates[elId] = state.copy(isPressed = false)
@@ -598,28 +515,18 @@ fun ControllerScreen(
             }
             ElementType.JOYSTICK -> {
                 if (el.joystickConfig.type == JoystickType.SKILL_AIM) {
-                    // BUG 2 FIX: Only send cast if the joystick was dragged significantly.
-                    // A tiny tap (no real drag) should NOT fire the skill.
                     val maxR = (elementBounds[elId]?.width() ?: 1f) * 0.4f
                     val nx   = if (maxR > 0f) (state.joystickOffX / maxR).coerceIn(-1f, 1f) else 0f
                     val ny   = if (maxR > 0f) -(state.joystickOffY / maxR).coerceIn(-1f, 1f) else 0f
                     val mag  = sqrt(nx * nx + ny * ny).coerceIn(0f, 1f)
-                    if (mag >= 0.1f) {
-                        // Meaningful drag → send cast with aim direction
-                        val angleDeg = Math.toDegrees(
-                            atan2(state.joystickOffY.toDouble(), state.joystickOffX.toDouble())
-                        ).toFloat()
-                        sendSkillAim(el.joystickConfig.skillKey, angleDeg, mag, "cast")
-                    }
-                    // If mag < 0.1f (just a tap with no real direction), do nothing
+                    // BUG FIX: Always send "cast" on release, regardless of magnitude.
+                    // Old code: if (mag >= 0.1f) { ... }
+                    // This meant a light tap (mag < 0.1) would NEVER send "cast",
+                    // leaving the skill key pressed permanently on the server.
+                    val angleDeg = Math.toDegrees(atan2(state.joystickOffY.toDouble(), state.joystickOffX.toDouble())).toFloat()
+                    sendSkillAim(el.joystickConfig.skillKey, angleDeg, mag.coerceAtLeast(0.01f), "cast")
                 } else {
-                    // Send zero once to stop movement immediately
-                    webSocketManager.send(gson.toJson(mapOf(
-                        "type"  to "joystick",
-                        "stick" to "movement",
-                        "x"     to 0f,
-                        "y"     to 0f
-                    )))
+                    webSocketManager.send(gson.toJson(mapOf("type" to "joystick", "stick" to "movement", "x" to 0f, "y" to 0f)))
                 }
                 elementStates[elId] = state.copy(isPressed = false, joystickOffX = 0f, joystickOffY = 0f)
             }
@@ -637,101 +544,41 @@ fun ControllerScreen(
             }
             ElementType.TOUCHPAD -> {
                 val now = System.currentTimeMillis()
-
                 if (pointerId == state.pointer2Id) {
-                    // ── Second finger lifted ───────────────────────────────────
-                    // 2-finger tap (no scroll occurred) → right click
                     if (!state.twoFingerScrollActive) {
                         sendMouseClick("right", true)
                         sendMouseClick("right", false)
                     }
-                    // Return to single-finger tracking
-                    elementStates[elId] = state.copy(
-                        pointer2Id            = -1,
-                        twoFingerDown         = false,
-                        twoFingerScrollActive = false
-                    )
+                    elementStates[elId] = state.copy(pointer2Id = -1, twoFingerDown = false, twoFingerScrollActive = false)
                 } else if (state.twoFingerDown) {
-                    // ── Primary finger lifted while two-finger gesture active ──
-                    // Nothing special; just mark as no longer two-finger
-                    elementStates[elId] = state.copy(
-                        isPressed             = false,
-                        twoFingerDown         = false,
-                        twoFingerScrollActive = false,
-                        pointer2Id            = -1
-                    )
+                    elementStates[elId] = state.copy(isPressed = false, twoFingerDown = false, twoFingerScrollActive = false, pointer2Id = -1)
                 } else {
-                    // ── Primary finger lifted (single-finger gesture) ──────────
                     if (state.isDoubleTapDrag) {
-                        // Double-tap drag ended — release the held left button
                         sendMouseClick("left", false)
-                        elementStates[elId] = state.copy(
-                            isPressed        = false,
-                            touchMoved       = false,
-                            isDoubleTapDrag  = false,
-                            lastTapTime      = 0L
-                        )
+                        elementStates[elId] = state.copy(isPressed = false, touchMoved = false, isDoubleTapDrag = false, lastTapTime = 0L)
                         return
                     }
                     if (state.isLongPressed) {
-                        // Release the held left click (click-drag end)
                         sendMouseClick("left", false)
-                        elementStates[elId] = state.copy(
-                            isPressed     = false,
-                            touchMoved    = false,
-                            isLongPressed = false
-                        )
+                        elementStates[elId] = state.copy(isPressed = false, touchMoved = false, isLongPressed = false)
                     } else if (!state.touchMoved) {
                         val heldMs = now - state.touchDownTime
                         if (heldMs < tapMaxMs) {
-                            // ── SINGLE / DOUBLE-TAP DETECTION ────────────────────
-                            // Compare time since last tap UP (stored in lastTapTime).
-                            // If within doubleTapMs → tap-2: fire double-click.
-                            // Otherwise            → tap-1: fire single click, record time.
                             val timeSinceLastTap = now - state.lastTapTime
-                            val isDoubleTap = state.lastTapTime > 0L &&
-                                    timeSinceLastTap < doubleTapMs
-
+                            val isDoubleTap = state.lastTapTime > 0L && timeSinceLastTap < doubleTapMs
                             if (isDoubleTap) {
-                                // TAP 2 — send two rapid click pairs so OS sees double-click
-                                sendMouseClick("left", true)
-                                sendMouseClick("left", false)
-                                sendMouseClick("left", true)
-                                sendMouseClick("left", false)
-                                elementStates[elId] = state.copy(
-                                    isPressed   = false,
-                                    lastTapTime = 0L   // reset so next tap starts fresh
-                                )
+                                sendMouseClick("left", true); sendMouseClick("left", false)
+                                sendMouseClick("left", true); sendMouseClick("left", false)
+                                elementStates[elId] = state.copy(isPressed = false, lastTapTime = 0L)
                             } else {
-                                // TAP 1 — send single click, record time for tap-2 check
-                                sendMouseClick("left", true)
-                                sendMouseClick("left", false)
-                                elementStates[elId] = state.copy(
-                                    isPressed   = false,
-                                    lastTapTime = now
-                                )
+                                sendMouseClick("left", true); sendMouseClick("left", false)
+                                elementStates[elId] = state.copy(isPressed = false, lastTapTime = now)
                             }
                             return
                         }
-                        // Held too long to be a tap — treat as no-op release
-                        elementStates[elId] = state.copy(
-                            isPressed     = false,
-                            touchMoved    = false,
-                            isLongPressed = false,
-                            pointer2Id    = -1,
-                            twoFingerDown = false,
-                            twoFingerScrollActive = false
-                        )
+                        elementStates[elId] = state.copy(isPressed = false, touchMoved = false, isLongPressed = false, pointer2Id = -1, twoFingerDown = false, twoFingerScrollActive = false)
                     } else {
-                        // Finger moved — drag/scroll release, no click
-                        elementStates[elId] = state.copy(
-                            isPressed             = false,
-                            touchMoved            = false,
-                            isLongPressed         = false,
-                            pointer2Id            = -1,
-                            twoFingerDown         = false,
-                            twoFingerScrollActive = false
-                        )
+                        elementStates[elId] = state.copy(isPressed = false, touchMoved = false, isLongPressed = false, pointer2Id = -1, twoFingerDown = false, twoFingerScrollActive = false)
                     }
                 }
             }
@@ -739,7 +586,6 @@ fun ControllerScreen(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Outer Box: Layer 1 = controller input, Layer 2 = exit button (zIndex)
     Box(modifier = Modifier.fillMaxSize()) {
 
         // ── Layer 1: Multi-touch controller area ──────────────────────────────
@@ -747,13 +593,12 @@ fun ControllerScreen(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ConsensiusColors.Background)
+                .background(NeoColors.Background)
         ) {
             val screenW = maxWidth
             val screenH = maxHeight
             val currentElements = activeProfile?.pages?.getOrNull(currentPage)?.elements ?: emptyList()
 
-            // ── Single root multitouch catcher ────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -762,10 +607,8 @@ fun ControllerScreen(
                             val action = event.actionMasked
                             val pointerIndex = event.actionIndex
                             val pointerId = event.getPointerId(pointerIndex)
-
                             when (action) {
-                                MotionEvent.ACTION_DOWN,
-                                MotionEvent.ACTION_POINTER_DOWN -> {
+                                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                                     val rawX = event.getX(pointerIndex)
                                     val rawY = event.getY(pointerIndex)
                                     onPointerDown(pointerId, rawX, rawY)
@@ -776,14 +619,9 @@ fun ControllerScreen(
                                         onPointerMove(pid, event.getX(i), event.getY(i))
                                     }
                                 }
-                                MotionEvent.ACTION_UP,
-                                MotionEvent.ACTION_POINTER_UP -> {
-                                    onPointerUp(pointerId)
-                                }
+                                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> onPointerUp(pointerId)
                                 MotionEvent.ACTION_CANCEL -> {
-                                    pointerToElement.keys.toList().forEach { pid ->
-                                        onPointerUp(pid)
-                                    }
+                                    pointerToElement.keys.toList().forEach { pid -> onPointerUp(pid) }
                                     pointerToElement.clear()
                                 }
                             }
@@ -793,10 +631,6 @@ fun ControllerScreen(
                         true
                     }
             ) {
-                // ── Render all elements on current page ───────────────────────────
-                // Each element uses its own width and height (in dp),
-                // never a shared or global size state. sizeDp is only used for
-                // nonrectangular elements; widthDp and heightDp are used for positioning.
                 currentElements.forEach { el ->
                     val widthDp  = el.width.dp
                     val heightDp = el.height.dp
@@ -807,9 +641,6 @@ fun ControllerScreen(
                     Box(
                         modifier = Modifier
                             .offset(x = posX, y = posY)
-                            // Register actual rendered bounds for hit testing.
-                            // boundsInRoot() gives the true screen rect of this Box,
-                            // including the 2.5x width of a touchpad.
                             .onGloballyPositioned { layoutCoords ->
                                 val bounds = layoutCoords.boundsInRoot()
                                 elementBounds[el.id] = android.graphics.RectF(
@@ -819,58 +650,36 @@ fun ControllerScreen(
                     ) {
                         when (el.type) {
                             ElementType.BUTTON ->
-                                ControllerButton(
-                                    element  = el,
-                                    widthDp  = widthDp,
-                                    heightDp = heightDp,
-                                    isPressed = state.isPressed
-                                )
+                                ControllerButton(element = el, widthDp = widthDp, heightDp = heightDp, isPressed = state.isPressed)
                             ElementType.JOYSTICK ->
-                                ControllerJoystick(
-                                    element = el,
-                                    sizeDp  = widthDp,  // joystick always square
-                                    offsetX = state.joystickOffX,
-                                    offsetY = state.joystickOffY
-                                )
+                                ControllerJoystick(element = el, sizeDp = widthDp, offsetX = state.joystickOffX, offsetY = state.joystickOffY)
                             ElementType.DPAD ->
-                                ControllerDpad(
-                                    element  = el,
-                                    widthDp  = widthDp,
-                                    heightDp = heightDp,
-                                    activeDir = state.activeDpadDir
-                                )
+                                ControllerDpad(element = el, widthDp = widthDp, heightDp = heightDp, activeDir = state.activeDpadDir)
                             ElementType.TOUCHPAD ->
-                                ControllerTouchpad(
-                                    element   = el,
-                                    widthDp   = widthDp,
-                                    heightDp  = heightDp,
-                                    isActive  = state.isPressed,
-                                    onBoundsChanged = { rect ->
-                                        touchpadActualBounds[el.id] = rect
-                                    }
-                                )
+                                ControllerTouchpad(element = el, widthDp = widthDp, heightDp = heightDp, isActive = state.isPressed,
+                                    onBoundsChanged = { rect -> touchpadActualBounds[el.id] = rect })
                         }
                     }
                 }
 
-                // ── Profile label (top-right) ─────────────────────────────────────
+                // Profile label
                 Text(
                     text = activeProfile?.name ?: "",
-                    color = ConsensiusColors.TextSecondary.copy(alpha = 0.35f),
-                    fontSize = 9.sp,
+                    color = NeoColors.TextMuted,
+                    fontSize = 8.sp,
                     letterSpacing = 1.sp,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 6.dp, end = 10.dp)
                 )
 
-                // ── Page indicator (top center) ───────────────────────────────────
+                // Page indicator
                 val pageCount = activeProfile?.pages?.size ?: 1
                 if (pageCount > 1) {
                     Row(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 8.dp),
+                            .padding(top = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -880,7 +689,7 @@ fun ControllerScreen(
                                 modifier = Modifier
                                     .size(if (isActive) 8.dp else 5.dp)
                                     .background(
-                                        if (isActive) ConsensiusColors.Accent else ConsensiusColors.TextSecondary.copy(alpha = 0.4f),
+                                        if (isActive) NeoColors.ElectricBlue else NeoColors.TextMuted,
                                         CircleShape
                                     )
                             )
@@ -888,28 +697,25 @@ fun ControllerScreen(
                     }
                 }
 
-                // ── Page switcher pill (top center, only if >1 page) ──────────────
+                // Page switcher pill
                 if (pageCount > 1) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
-                            .padding(top = 30.dp)
-                            .background(
-                                ConsensiusColors.Card.copy(alpha = 0.7f),
-                                RoundedCornerShape(12.dp)
-                            )
-                            .border(1.dp, ConsensiusColors.CardBorder, RoundedCornerShape(12.dp))
+                            .padding(top = 26.dp)
+                            .background(NeoColors.GlassCard, RoundedCornerShape(12.dp))
+                            .border(0.5.dp, NeoColors.GlassBorder, RoundedCornerShape(12.dp))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
                             "Page ${currentPage + 1} / $pageCount  (hold to switch)",
-                            color = ConsensiusColors.TextSecondary,
-                            fontSize = 9.sp
+                            color = NeoColors.TextTertiary,
+                            fontSize = 8.sp
                         )
                     }
                 }
 
-                // ── Page overlay ──────────────────────────────────────────────────
+                // Page overlay
                 if (showPageOverlay) {
                     Box(
                         modifier = Modifier
@@ -924,31 +730,28 @@ fun ControllerScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
                                         .background(
-                                            if (isActive) ConsensiusColors.Accent.copy(alpha = 0.15f)
-                                            else ConsensiusColors.Card,
-                                            RoundedCornerShape(12.dp)
+                                            if (isActive) NeoColors.ElectricBlue.copy(alpha = 0.12f)
+                                            else NeoColors.GlassCard,
+                                            RoundedCornerShape(14.dp)
                                         )
                                         .border(
                                             1.5.dp,
-                                            if (isActive) ConsensiusColors.Accent else ConsensiusColors.CardBorder,
-                                            RoundedCornerShape(12.dp)
+                                            if (isActive) NeoColors.ElectricBlue else NeoColors.GlassBorder,
+                                            RoundedCornerShape(14.dp)
                                         )
                                         .padding(horizontal = 16.dp, vertical = 12.dp)
                                 ) {
                                     Text(page.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Spacer(Modifier.height(4.dp))
-                                    Text("${page.elements.size} elements", color = ConsensiusColors.TextSecondary, fontSize = 10.sp)
+                                    Text("${page.elements.size} elements", color = NeoColors.TextSecondary, fontSize = 10.sp)
                                 }
                             }
                         }
-                        // close on tap
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .pointerInteropFilter { event ->
-                                    if (event.actionMasked == MotionEvent.ACTION_UP) {
-                                        showPageOverlay = false
-                                    }
+                                    if (event.actionMasked == MotionEvent.ACTION_UP) showPageOverlay = false
                                     false
                                 }
                         )
@@ -957,14 +760,8 @@ fun ControllerScreen(
             }
         }
 
-        // ── Layer 2: Exit button — outside pointerInteropFilter, always on top ─
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(10f)
-        ) {
-            // Exit button is placed here, outside the multitouch
-            // pointerInteropFilter Box so its onClick is never consumed by controller input.
+        // ── Layer 2: Exit button ─────────────────────────────────────────────
+        Box(modifier = Modifier.fillMaxSize().zIndex(10f)) {
             Button(
                 onClick = { showExitDialog = true },
                 modifier = Modifier
@@ -973,283 +770,226 @@ fun ControllerScreen(
                     .height(28.dp),
                 shape = RoundedCornerShape(6.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = ConsensiusColors.Error.copy(alpha = 0.65f)
+                    containerColor = NeoColors.Error.copy(alpha = 0.65f)
                 ),
                 contentPadding = PaddingValues(horizontal = 10.dp)
             ) {
                 Text("X  EXIT", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
 
-            // ── Exit dialog (also in Layer 2) ─────────────────────────────────
             if (showExitDialog) {
                 AlertDialog(
                     onDismissRequest = { showExitDialog = false },
-                    containerColor = ConsensiusColors.Card,
-                    title = { Text("Exit Controller", color = ConsensiusColors.TextPrimary, fontWeight = FontWeight.Bold) },
-                    text  = { Text("Exit controller and disconnect?", color = ConsensiusColors.TextSecondary) },
+                    containerColor = NeoColors.GlassCard,
+                    shape = RoundedCornerShape(20.dp),
+                    title = { Text("Exit Controller", color = NeoColors.TextPrimary, fontWeight = FontWeight.Bold) },
+                    text  = { Text("Exit controller and disconnect?", color = NeoColors.TextSecondary) },
                     confirmButton = {
                         Button(
-                            onClick = {
-                                webSocketManager.disconnect()
-                                onNavigateBack()
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = ConsensiusColors.Error)
-                        ) { Text("YES") }
+                            onClick = { webSocketManager.disconnect(); onNavigateBack() },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = NeoColors.Error)
+                        ) { Text("Yes") }
                     },
                     dismissButton = {
                         TextButton(onClick = { showExitDialog = false }) {
-                            Text("NO", color = ConsensiusColors.TextSecondary)
+                            Text("No", color = NeoColors.TextSecondary)
                         }
                     }
                 )
             }
         }
-
-    } // end outer Box
+    }
 }
-
 
 // ─── Element Renderers ────────────────────────────────────────────────────────
 
 @Composable
-private fun ControllerButton(
-    element: CanvasElement,
-    widthDp: Dp,
-    heightDp: Dp,
-    isPressed: Boolean
-) {
+private fun ControllerButton(element: CanvasElement, widthDp: Dp, heightDp: Dp, isPressed: Boolean) {
     val glowElevation by animateFloatAsState(
         targetValue   = if (isPressed) 14f else 2f,
         animationSpec = tween(80),
         label         = "btnGlow"
     )
-    val sizeDp = minOf(widthDp, heightDp) // keep circular glow/shape based on smaller dimension
+    val sizeDp = minOf(widthDp, heightDp)
     Box(
         modifier = Modifier
-            .width(widthDp)
-            .height(heightDp)
-            .shadow(
-                glowElevation.dp, CircleShape,
-                ambientColor = ConsensiusColors.Accent,
-                spotColor    = ConsensiusColors.Accent
-            )
+            .width(widthDp).height(heightDp)
+            .shadow(glowElevation.dp, CircleShape,
+                ambientColor = NeoColors.ElectricBlue,
+                spotColor    = NeoColors.ElectricBlue)
             .background(
                 if (isPressed)
-                    Brush.radialGradient(listOf(ConsensiusColors.Accent.copy(alpha = 0.45f), ConsensiusColors.Card))
+                    Brush.radialGradient(
+                        colors = listOf(
+                            NeoColors.ElectricBlue.copy(alpha = 0.35f),
+                            NeoColors.Amethyst.copy(alpha = 0.15f),
+                            NeoColors.Surface
+                        )
+                    )
                 else
-                    Brush.radialGradient(listOf(ConsensiusColors.Card, ConsensiusColors.Surface)),
+                    Brush.radialGradient(
+                        colors = listOf(
+                            NeoColors.GlassElevated,
+                            NeoColors.SurfaceLight
+                        )
+                    ),
                 CircleShape
             )
             .border(
                 width = if (isPressed) 2.dp else 1.5.dp,
-                color = if (isPressed) ConsensiusColors.Accent else ConsensiusColors.Accent.copy(alpha = 0.45f),
+                color = if (isPressed) NeoColors.ElectricBlue else NeoColors.AccentBorder,
                 shape = CircleShape
             ),
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text       = element.label,
-            color      = if (isPressed) Color.White else ConsensiusColors.TextPrimary,
+            element.label,
+            color = if (isPressed) Color.White else NeoColors.TextPrimary,
             fontWeight = FontWeight.ExtraBold,
-            fontSize   = (sizeDp.value * 0.22f).sp,
-            textAlign  = TextAlign.Center
+            fontSize = (sizeDp.value * 0.22f).sp,
+            textAlign = TextAlign.Center
         )
     }
 }
 
 @Composable
-private fun ControllerJoystick(
-    element:  CanvasElement,
-    sizeDp:   Dp,
-    offsetX:  Float,
-    offsetY:  Float
-) {
+private fun ControllerJoystick(element: CanvasElement, sizeDp: Dp, offsetX: Float, offsetY: Float) {
     val isSkillAim = element.joystickConfig.type == JoystickType.SKILL_AIM
-    val ringColor  = if (isSkillAim) ConsensiusColors.AccentSecondary else ConsensiusColors.Accent
-    val thumbColor = if (isSkillAim)
-        Brush.radialGradient(listOf(ConsensiusColors.AccentSecondary, Color(0xFF0062CC)))
+    val accentColor = if (isSkillAim) NeoColors.Cyan else NeoColors.ElectricBlue
+    val thumbGradient = if (isSkillAim)
+        Brush.radialGradient(listOf(NeoColors.Cyan, NeoColors.DeepBlue))
     else
-        Brush.radialGradient(listOf(ConsensiusColors.AccentSecondary, ConsensiusColors.Accent))
+        Brush.radialGradient(listOf(NeoColors.IceBlue, NeoColors.ElectricBlue))
 
     val thumbSize = sizeDp * 0.36f
 
     val infiniteTransition = rememberInfiniteTransition(label = "js_ring")
     val ringAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.65f,
+        initialValue = 0.25f, targetValue = 0.55f,
         animationSpec = infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "ringAlpha"
     )
 
-    Box(
-        modifier = Modifier.size(sizeDp),
-        contentAlignment = Alignment.Center
-    ) {
+    Box(modifier = Modifier.size(sizeDp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val r = size.minDimension / 2f
-            drawCircle(ringColor.copy(alpha = ringAlpha), r, style = Stroke(2f))
+            drawCircle(accentColor.copy(alpha = ringAlpha), r, style = Stroke(2f))
             drawCircle(
-                Brush.radialGradient(
-                    listOf(ringColor.copy(alpha = 0.07f), Color.Transparent)
-                ), r
+                Brush.radialGradient(listOf(accentColor.copy(alpha = 0.05f), Color.Transparent)),
+                r
             )
         }
 
-        // BUG 2 FIX: Show user-defined element label (centered, faint watermark inside ring)
         Text(
-            text = element.label.ifBlank { if (isSkillAim) "AIM" else "MOV" },
-            color = ringColor.copy(alpha = 0.2f),
-            fontSize = (sizeDp.value * 0.14f).sp,
+            element.label.ifBlank { if (isSkillAim) "AIM" else "MOV" },
+            color = accentColor.copy(alpha = 0.15f),
+            fontSize = (sizeDp.value * 0.13f).sp,
             fontWeight = FontWeight.Bold
         )
 
-        // Thumb
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                .size(thumbSize)
-                .shadow(8.dp, CircleShape)
-                .background(thumbColor, CircleShape)
-        )
+        Box(modifier = Modifier
+            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+            .size(thumbSize)
+            .shadow(10.dp, CircleShape)
+            .background(thumbGradient, CircleShape))
 
-        // BUG 2 FIX: Show user-defined label BELOW the joystick ring
         if (element.label.isNotBlank()) {
             Text(
-                text = element.label,
-                color = Color(0xFF8899AA),
-                fontSize = 10.sp,
+                element.label, color = NeoColors.TextTertiary, fontSize = 10.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = 14.dp)
+                modifier = Modifier.align(Alignment.BottomCenter).offset(y = 14.dp)
             )
         }
     }
 }
 
 @Composable
-private fun ControllerDpad(
-    element: CanvasElement,
-    widthDp: Dp,
-    heightDp: Dp,
-    activeDir: String?
-) {
-    Box(
-        modifier         = Modifier.width(widthDp).height(heightDp),
-        contentAlignment = Alignment.Center
-    ) {
+private fun ControllerDpad(element: CanvasElement, widthDp: Dp, heightDp: Dp, activeDir: String?) {
+    Box(modifier = Modifier.width(widthDp).height(heightDp), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.width(widthDp).height(heightDp)) {
-            val w  = size.width
-            val h  = size.height
-            val aw = minOf(w, h) * 0.30f
-            val cx = w / 2f
-            val cy = h / 2f
-
+            val w = size.width; val h = size.height; val aw = minOf(w, h) * 0.30f
+            val cx = w / 2f; val cy = h / 2f
             fun dirActive(dir: String) = activeDir == dir
 
-            // Horizontal bar
-            drawRect(
-                color   = if (dirActive("left") || dirActive("right")) ConsensiusColors.Accent.copy(0.5f) else ConsensiusColors.Surface,
-                topLeft = Offset(cx - w * 0.5f, cy - aw / 2),
-                size    = androidx.compose.ui.geometry.Size(w, aw)
-            )
-            // Vertical bar
-            drawRect(
-                color   = if (dirActive("up") || dirActive("down")) ConsensiusColors.Accent.copy(0.5f) else ConsensiusColors.Surface,
-                topLeft = Offset(cx - aw / 2, cy - h * 0.5f),
-                size    = androidx.compose.ui.geometry.Size(aw, h)
-            )
-            // Active direction highlights
-            if (dirActive("left"))  drawRect(ConsensiusColors.Accent.copy(0.4f), Offset(cx - w * 0.5f, cy - aw / 2), androidx.compose.ui.geometry.Size(w * 0.38f, aw))
-            if (dirActive("right")) drawRect(ConsensiusColors.Accent.copy(0.4f), Offset(cx + w * 0.12f, cy - aw / 2), androidx.compose.ui.geometry.Size(w * 0.38f, aw))
-            if (dirActive("up"))    drawRect(ConsensiusColors.Accent.copy(0.4f), Offset(cx - aw / 2, cy - h * 0.5f), androidx.compose.ui.geometry.Size(aw, h * 0.38f))
-            if (dirActive("down"))  drawRect(ConsensiusColors.Accent.copy(0.4f), Offset(cx - aw / 2, cy + h * 0.12f), androidx.compose.ui.geometry.Size(aw, h * 0.38f))
-            // Borders
-            drawRect(ConsensiusColors.Accent.copy(0.35f), Offset(cx - w * 0.5f, cy - aw / 2), androidx.compose.ui.geometry.Size(w, aw), style = Stroke(1.5f))
-            drawRect(ConsensiusColors.Accent.copy(0.35f), Offset(cx - aw / 2, cy - h * 0.5f), androidx.compose.ui.geometry.Size(aw, h), style = Stroke(1.5f))
+            drawRect(if (dirActive("left") || dirActive("right")) NeoColors.ElectricBlue.copy(0.4f) else NeoColors.Surface,
+                Offset(cx - w * 0.5f, cy - aw / 2), Size(w, aw))
+            drawRect(if (dirActive("up") || dirActive("down")) NeoColors.ElectricBlue.copy(0.4f) else NeoColors.Surface,
+                Offset(cx - aw / 2, cy - h * 0.5f), Size(aw, h))
+
+            if (dirActive("left"))  drawRect(NeoColors.ElectricBlue.copy(0.35f), Offset(cx - w * 0.5f, cy - aw / 2), Size(w * 0.38f, aw))
+            if (dirActive("right")) drawRect(NeoColors.ElectricBlue.copy(0.35f), Offset(cx + w * 0.12f, cy - aw / 2), Size(w * 0.38f, aw))
+            if (dirActive("up"))    drawRect(NeoColors.ElectricBlue.copy(0.35f), Offset(cx - aw / 2, cy - h * 0.5f), Size(aw, h * 0.38f))
+            if (dirActive("down"))  drawRect(NeoColors.ElectricBlue.copy(0.35f), Offset(cx - aw / 2, cy + h * 0.12f), Size(aw, h * 0.38f))
+
+            drawRect(NeoColors.ElectricBlue.copy(0.3f), Offset(cx - w * 0.5f, cy - aw / 2), Size(w, aw), style = Stroke(1.5f))
+            drawRect(NeoColors.ElectricBlue.copy(0.3f), Offset(cx - aw / 2, cy - h * 0.5f), Size(aw, h), style = Stroke(1.5f))
         }
 
-        // Arrow labels
-        val arrowColor = ConsensiusColors.TextSecondary.copy(alpha = 0.5f)
-        Text("^", color = if (activeDir == "up")    Color.White else arrowColor, fontSize = (heightDp.value * 0.15f).sp, modifier = Modifier.offset(y = -heightDp * 0.3f))
-        Text("v", color = if (activeDir == "down")  Color.White else arrowColor, fontSize = (heightDp.value * 0.15f).sp, modifier = Modifier.offset(y =  heightDp * 0.3f))
-        Text("<", color = if (activeDir == "left")  Color.White else arrowColor, fontSize = (widthDp.value  * 0.15f).sp, modifier = Modifier.offset(x = -widthDp  * 0.3f))
-        Text(">", color = if (activeDir == "right") Color.White else arrowColor, fontSize = (widthDp.value  * 0.15f).sp, modifier = Modifier.offset(x =  widthDp  * 0.3f))
+        val arrowColor = NeoColors.TextTertiary.copy(alpha = 0.5f)
+        Text("^", color = if (activeDir == "up") Color.White else arrowColor, fontSize = (heightDp.value * 0.15f).sp, modifier = Modifier.offset(y = -heightDp * 0.3f))
+        Text("v", color = if (activeDir == "down") Color.White else arrowColor, fontSize = (heightDp.value * 0.15f).sp, modifier = Modifier.offset(y =  heightDp * 0.3f))
+        Text("<", color = if (activeDir == "left") Color.White else arrowColor, fontSize = (widthDp.value * 0.15f).sp, modifier = Modifier.offset(x = -widthDp * 0.3f))
+        Text(">", color = if (activeDir == "right") Color.White else arrowColor, fontSize = (widthDp.value * 0.15f).sp, modifier = Modifier.offset(x =  widthDp * 0.3f))
 
         if (element.label.isNotBlank()) {
-            Text(
-                text      = element.label,
-                color     = Color(0xFF8899AA),
-                fontSize  = 10.sp,
+            Text(element.label, color = NeoColors.TextTertiary, fontSize = 10.sp,
                 textAlign = TextAlign.Center,
-                modifier  = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-14).dp)
-            )
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = (-14).dp))
         }
     }
 }
 
 @Composable
-private fun ControllerTouchpad(
-    element: CanvasElement,
-    widthDp: Dp,
-    heightDp: Dp,
-    isActive: Boolean,
-    onBoundsChanged: (android.graphics.RectF) -> Unit = {}
-) {
+private fun ControllerTouchpad(element: CanvasElement, widthDp: Dp, heightDp: Dp, isActive: Boolean, onBoundsChanged: (android.graphics.RectF) -> Unit = {}) {
     Box(
         modifier = Modifier
-            .width(widthDp)
-            .height(heightDp)
+            .width(widthDp).height(heightDp)
             .background(
-                Brush.linearGradient(listOf(
-                    ConsensiusColors.Surface.copy(alpha = 0.55f),
-                    ConsensiusColors.Card.copy(alpha = 0.55f)
-                )),
-                RoundedCornerShape(14.dp)
+                Brush.linearGradient(
+                    listOf(
+                        NeoColors.Surface.copy(alpha = 0.5f),
+                        NeoColors.SurfaceLight.copy(alpha = 0.3f)
+                    )
+                ),
+                RoundedCornerShape(16.dp)
             )
             .border(
                 1.dp,
-                if (isActive) ConsensiusColors.AccentSecondary.copy(0.7f) else ConsensiusColors.AccentSecondary.copy(0.3f),
-                RoundedCornerShape(14.dp)
+                if (isActive) NeoColors.Cyan.copy(0.6f) else NeoColors.Cyan.copy(0.25f),
+                RoundedCornerShape(16.dp)
             )
-            // Report the actual rendered bounds of this wide touchpad box
-            // back to the parent so hit testing covers the full area.
             .onGloballyPositioned { layoutCoords ->
                 val b = layoutCoords.boundsInRoot()
-                onBoundsChanged(
-                    android.graphics.RectF(b.left, b.top, b.right, b.bottom)
-                )
+                onBoundsChanged(android.graphics.RectF(b.left, b.top, b.right, b.bottom))
             },
         contentAlignment = Alignment.Center
     ) {
-        // Dot-grid texture
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val sp = 14.dp.toPx()
+            val sp = 16.dp.toPx()
             var gx = sp
             while (gx < size.width) {
                 var gy = sp
                 while (gy < size.height) {
-                    drawCircle(Color(0xFF00C2FF).copy(alpha = 0.12f), 1.2f, Offset(gx, gy))
+                    drawCircle(NeoColors.Cyan.copy(alpha = 0.08f), 1.0f, Offset(gx, gy))
                     gy += sp
                 }
                 gx += sp
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // BUG 2 FIX: Show user-defined label at top; fallback to "TOUCHPAD" if blank
             Text(
-                text = element.label.ifBlank { "TOUCHPAD" },
-                color = ConsensiusColors.TextSecondary.copy(0.5f),
-                fontSize = 9.sp, letterSpacing = 1.sp
+                element.label.ifBlank { "TOUCHPAD" },
+                color = NeoColors.TextTertiary.copy(0.5f),
+                fontSize = 9.sp,
+                letterSpacing = 1.sp
             )
             Text(
                 "tap=click  2-tap=right  hold=drag  tap-tap-hold=scroll",
-                color = ConsensiusColors.AccentSecondary.copy(0.35f),
+                color = NeoColors.Cyan.copy(0.3f),
                 fontSize = 7.sp,
                 letterSpacing = 0.3.sp
             )
         }
     }
 }
-
