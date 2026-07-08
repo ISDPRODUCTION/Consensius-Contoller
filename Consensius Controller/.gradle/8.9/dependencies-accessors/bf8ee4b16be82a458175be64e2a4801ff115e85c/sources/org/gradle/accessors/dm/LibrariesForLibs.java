@@ -347,7 +347,7 @@ public class LibrariesForLibs extends AbstractExternalDependencyFactory {
         public Provider<String> getAgp() { return getVersion("agp"); }
 
         /**
-         * Version alias <b>composeBom</b> with value <b>2024.05.00</b>
+         * Version alias <b>composeBom</b> with value <b>2024.12.01</b>
          * <p>
          * If the version is a rich version and cannot be represented as a
          * single version string, an empty string is returned.
@@ -407,7 +407,7 @@ public class LibrariesForLibs extends AbstractExternalDependencyFactory {
         public Provider<String> getLifecycleRuntimeKtx() { return getVersion("lifecycleRuntimeKtx"); }
 
         /**
-         * Version alias <b>navigationCompose</b> with value <b>2.7.7</b>
+         * Version alias <b>navigationCompose</b> with value <b>2.8.9</b>
          * <p>
          * If the version is a rich version and cannot be represented as a
          * single version string, an empty string is returned.

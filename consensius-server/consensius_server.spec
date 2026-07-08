@@ -10,13 +10,12 @@ from pathlib import Path
 
 block_cipher = None
 
-# ── Locate customtkinter assets ─────────────────────────────────────────────
+# -- Locate customtkinter assets ---------------------------------------------
 import customtkinter
 CTK_DIR = Path(customtkinter.__file__).parent
 
-# ── Collect all data files needed at runtime ────────────────────────────────
+# -- Collect all data files needed at runtime --------------------------------
 added_files = [
-    # CustomTkinter theme & font assets (required at runtime)
     (str(CTK_DIR / "assets"), "customtkinter/assets"),
 ]
 
@@ -50,19 +49,14 @@ a = Analysis(
         "tkinter.ttk",
         # customtkinter
         "customtkinter",
-        # project modules – explicitly include to be safe
+        # project modules -- live code only
         "network.websocket_server",
         "input.input_handler",
         "core.config_manager",
         "core.profile_manager",
         "core.event_bus",
-        "core.event_inspector",
-        "core.input_engine",
-        "core.input_normalizer",
         "core.action_mapper",
-        "core.logger",
         "core.models",
-        "core.protocol_validator",
         "core.state_manager",
         "ui.app_window",
         "ui.connection_page",
@@ -70,10 +64,6 @@ a = Analysis(
         "ui.monitor_page",
         "ui.settings_page",
         "ui.about_page",
-        "ui.widgets.buttons_card",
-        "ui.widgets.connection_card",
-        "ui.widgets.events_card",
-        "ui.widgets.joystick_card",
     ],
     hookspath=[],
     hooksconfig={},
@@ -107,11 +97,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    # ── Windows-specific ────────────────────────────────
-    console=False,           # No terminal/console window (GUI app)
+    # -- Windows-specific --
+    console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon="assets/icon.ico",   # App icon (Windows)
+    icon="assets/icon.ico",
 )
