@@ -42,7 +42,7 @@ class AboutPage(ctk.CTkFrame):
                      font=("Consolas", 22, "bold"), text_color=TEXT).grid(
                          row=1, column=0, pady=(12, 2))
 
-        ctk.CTkLabel(card, text="v1.2.0",
+        ctk.CTkLabel(card, text="v2.0",
                      font=("Consolas", 12), text_color=ACCENT).grid(
                          row=2, column=0, pady=(0, 20))
 

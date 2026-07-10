@@ -169,6 +169,70 @@ class SettingsDataStore(private val context: Context) {
 
     private fun defaultProfiles(): List<ControllerProfile> = listOf(
         ControllerProfile(
+            id = "default-xbox360",
+            name = "Xbox 360",
+            pages = listOf(
+                ProfilePage(
+                    id = "xbox-page-1",
+                    name = "Page 1",
+                    elements = listOf(
+                        CanvasElement(id = "xb-dpad", type = ElementType.DPAD, label = "DPAD",
+                            x = 0.20f, y = 0.70f,
+                            width = ElementDefaults.DPAD_WIDTH, height = ElementDefaults.DPAD_HEIGHT,
+                            dpadConfig = DpadElementConfig("dpad_up","dpad_down","dpad_left","dpad_right")),
+                        CanvasElement(id = "xb-js-left", type = ElementType.JOYSTICK, label = "LS",
+                            x = 0.12f, y = 0.35f,
+                            width = ElementDefaults.JOYSTICK_SIZE, height = ElementDefaults.JOYSTICK_SIZE,
+                            joystickConfig = JoystickElementConfig(JoystickType.MOVEMENT)),
+                        CanvasElement(id = "xb-js-right", type = ElementType.JOYSTICK, label = "RS",
+                            x = 0.70f, y = 0.75f,
+                            width = ElementDefaults.JOYSTICK_SIZE, height = ElementDefaults.JOYSTICK_SIZE,
+                            joystickConfig = JoystickElementConfig(JoystickType.SKILL_AIM, "")), // SKILL_AIM with empty key acts as Right Joystick (Camera)
+                        CanvasElement(id = "xb-y", type = ElementType.BUTTON, label = "Y",
+                            x = 0.85f, y = 0.25f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
+                            buttonConfig = ButtonElementConfig("y")),
+                        CanvasElement(id = "xb-x", type = ElementType.BUTTON, label = "X",
+                            x = 0.77f, y = 0.40f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
+                            buttonConfig = ButtonElementConfig("x")),
+                        CanvasElement(id = "xb-b", type = ElementType.BUTTON, label = "B",
+                            x = 0.93f, y = 0.40f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
+                            buttonConfig = ButtonElementConfig("b")),
+                        CanvasElement(id = "xb-a", type = ElementType.BUTTON, label = "A",
+                            x = 0.85f, y = 0.55f,
+                            width = ElementDefaults.BUTTON_WIDTH, height = ElementDefaults.BUTTON_HEIGHT,
+                            buttonConfig = ButtonElementConfig("a")),
+                        CanvasElement(id = "xb-lb", type = ElementType.BUTTON, label = "LB",
+                            x = 0.15f, y = 0.10f,
+                            width = 90f, height = 45f,
+                            buttonConfig = ButtonElementConfig("lb")),
+                        CanvasElement(id = "xb-lt", type = ElementType.BUTTON, label = "LT",
+                            x = 0.30f, y = 0.10f,
+                            width = 90f, height = 45f,
+                            buttonConfig = ButtonElementConfig("lt")),
+                        CanvasElement(id = "xb-rb", type = ElementType.BUTTON, label = "RB",
+                            x = 0.85f, y = 0.10f,
+                            width = 90f, height = 45f,
+                            buttonConfig = ButtonElementConfig("rb")),
+                        CanvasElement(id = "xb-rt", type = ElementType.BUTTON, label = "RT",
+                            x = 0.70f, y = 0.10f,
+                            width = 90f, height = 45f,
+                            buttonConfig = ButtonElementConfig("rt")),
+                        CanvasElement(id = "xb-back", type = ElementType.BUTTON, label = "Back",
+                            x = 0.40f, y = 0.20f,
+                            width = 60f, height = 40f,
+                            buttonConfig = ButtonElementConfig("back")),
+                        CanvasElement(id = "xb-start", type = ElementType.BUTTON, label = "Start",
+                            x = 0.60f, y = 0.20f,
+                            width = 60f, height = 40f,
+                            buttonConfig = ButtonElementConfig("start"))
+                    )
+                )
+            )
+        ),
+        ControllerProfile(
             id = "default-ml",
             name = "Mobile Legends",
             pages = listOf(

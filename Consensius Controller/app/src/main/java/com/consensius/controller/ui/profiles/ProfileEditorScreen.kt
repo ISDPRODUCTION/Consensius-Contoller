@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -779,12 +780,19 @@ private fun ElementSettingsSheet(
 
         when (element.type) {
             ElementType.BUTTON -> {
-                var label by remember(element.id) { mutableStateOf(element.label) }
-                var key   by remember(element.id) { mutableStateOf(element.buttonConfig.key) }
+                var label     by remember(element.id) { mutableStateOf(element.label) }
+                var key       by remember(element.id) { mutableStateOf(element.buttonConfig.key) }
+                var comboKeys by remember(element.id) { mutableStateOf(element.buttonConfig.comboKeys.joinToString("+")) }
                 SettingsLabel("Label (max 4 chars)")
                 SettingsTextField(label, { label = it.take(4); onUpdate(element.copy(label = label)) }, "e.g. S1")
                 SettingsLabel("Key Mapping")
-                SettingsTextField(key, { key = it; onUpdate(element.copy(buttonConfig = ButtonElementConfig(key))) }, "e.g. k, space, f1")
+                SettingsTextField(key, { key = it; onUpdate(element.copy(buttonConfig = element.buttonConfig.copy(key = key, comboKeys = comboKeys.split("+").map { k -> k.trim() }.filter { k -> k.isNotBlank() }))) }, "e.g. a, space, rb")
+                SettingsLabel("Combo Keys (opsional, pisah dengan +)")
+                SettingsTextField(comboKeys, {
+                    comboKeys = it
+                    val parsed = it.split("+").map { k -> k.trim() }.filter { k -> k.isNotBlank() }
+                    onUpdate(element.copy(buttonConfig = element.buttonConfig.copy(key = key, comboKeys = parsed)))
+                }, "e.g. rb+x  atau  lb")
             }
 
             ElementType.JOYSTICK -> {
@@ -816,9 +824,43 @@ private fun ElementSettingsSheet(
                     }
                 }
                 if (element.joystickConfig.type == JoystickType.SKILL_AIM) {
-                    var skillKey by remember(element.id) { mutableStateOf(element.joystickConfig.skillKey) }
-                    SettingsLabel("Skill Key Mapping")
-                    SettingsTextField(skillKey, { skillKey = it; onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(skillKey = it))) }, "e.g. k, q")
+                    var skillKey  by remember(element.id) { mutableStateOf(element.joystickConfig.skillKey) }
+                    var aimStick  by remember(element.id) { mutableStateOf(element.joystickConfig.aimStick) }
+                    var extraKeys by remember(element.id) { mutableStateOf(element.joystickConfig.extraKeys.joinToString("+")) }
+
+                    SettingsLabel("Skill Key (tombol yang ditahan saat aim)")
+                    SettingsTextField(skillKey, {
+                        skillKey = it
+                        onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(skillKey = it)))
+                    }, "e.g. rb, rt, lb, lt, j, k")
+
+                    SettingsLabel("Aim Mode")
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("mouse" to "Mouse", "right" to "R-Stick", "left" to "L-Stick").forEach { (value, label) ->
+                            val selected = aimStick == value
+                            Button(
+                                onClick = {
+                                    aimStick = value
+                                    onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(aimStick = value)))
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selected) NeoColors.ElectricBlue else NeoColors.Surface
+                                ),
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                            ) {
+                                Text(label, color = if (selected) Color.White else NeoColors.TextSecondary, fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    SettingsLabel("Extra Keys (opsional, pisah dengan +)")
+                    SettingsTextField(extraKeys, {
+                        extraKeys = it
+                        val parsed = it.split("+").map { k -> k.trim() }.filter { k -> k.isNotBlank() }
+                        onUpdate(element.copy(joystickConfig = element.joystickConfig.copy(extraKeys = parsed)))
+                    }, "e.g. x  atau  lb+y")
                 }
             }
 

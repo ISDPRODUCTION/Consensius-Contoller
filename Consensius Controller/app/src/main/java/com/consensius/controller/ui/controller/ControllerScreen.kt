@@ -216,27 +216,29 @@ fun ControllerScreen(
         )))
     }
 
-    fun sendJoystick(x: Float, y: Float) {
-        val mag = sqrt(x * x + y * y)
-        val (nx, ny) = if (mag < deadzoneThreshold) 0f to 0f else {
-            val s = ((mag - deadzoneThreshold) / (1f - deadzoneThreshold)) * sensitivity
-            (x / mag * s).coerceIn(-1f, 1f) to (y / mag * s).coerceIn(-1f, 1f)
-        }
+    fun sendJoystick(stickType: String, x: Float, y: Float) {
+        // Kirim langsung tanpa deadzone processing - deadzone sudah ditangani di FPS loop
+        // lewat (rawNx = joystickOffX / maxR) yang sudah dipotong oleh maxR
+        val nx = x.coerceIn(-1f, 1f)
+        val ny = y.coerceIn(-1f, 1f)
+        val stickName = if (stickType == JoystickType.SKILL_AIM.name) "camera" else "movement"
         webSocketManager.send(gson.toJson(mapOf(
             "type"  to "joystick",
-            "stick" to "movement",
+            "stick" to stickName,
             "x"     to nx,
             "y"     to ny
         )))
     }
 
-    fun sendSkillAim(key: String, angle: Float, magnitude: Float, state: String) {
+    fun sendSkillAim(key: String, angle: Float, magnitude: Float, state: String, aimStick: String, extraKeys: List<String>) {
         webSocketManager.send(gson.toJson(mapOf(
             "type"      to "skill_aim",
             "action"    to key,
             "angle"     to angle,
             "magnitude" to magnitude,
-            "state"     to state
+            "state"     to state,
+            "aimStick"  to aimStick,
+            "extraKeys" to extraKeys
         )))
     }
 
@@ -264,15 +266,16 @@ fun ControllerScreen(
     }
 
     // ── FPS loop ─────────────────────────────────────────────────────────────
-    LaunchedEffect(fps) {
-        val intervalMs = (1000f / fps.coerceIn(1, 120)).toLong()
+    // Pengiriman utama joystick sudah di onPointerMove (saat jari bergerak).
+    // FPS loop ini hanya sebagai keep-alive saat jari diam tapi tetap ditekan.
+    LaunchedEffect(Unit) {
+        val intervalMs = 16L // ~60fps
         while (true) {
-            delay(intervalMs.milliseconds)
+            delay(intervalMs)
             try {
-                val currentElements = activeProfile?.pages?.getOrNull(currentPage)?.elements
-                    ?: continue
-                currentElements
-                    .filter { it.type == ElementType.JOYSTICK && it.joystickConfig.type == JoystickType.MOVEMENT }
+                val page = activeProfile?.pages?.getOrNull(currentPage) ?: continue
+                page.elements
+                    .filter { it.type == ElementType.JOYSTICK }
                     .forEach { el ->
                         val state = elementStates[el.id] ?: return@forEach
                         if (!state.isPressed) return@forEach
@@ -283,13 +286,14 @@ fun ControllerScreen(
                             with(density) { el.width.dp.toPx() * 0.4f }
                         }
                         if (maxR > 0f) {
-                            val rawNx = state.joystickOffX / maxR
-                            val rawNy = state.joystickOffY / maxR
-                            if (rawNx.isFinite() && rawNy.isFinite()) {
-                                sendJoystick(
-                                    rawNx.coerceIn(-1f, 1f),
-                                    -(rawNy.coerceIn(-1f, 1f))
-                                )
+                            val nx = (state.joystickOffX / maxR).coerceIn(-1f, 1f)
+                            val ny = -(state.joystickOffY / maxR).coerceIn(-1f, 1f)
+                            if (nx.isFinite() && ny.isFinite()) {
+                                if (el.joystickConfig.type == JoystickType.MOVEMENT) {
+                                    sendJoystick(JoystickType.MOVEMENT.name, nx, ny)
+                                } else if (el.joystickConfig.type == JoystickType.SKILL_AIM && el.joystickConfig.skillKey.isBlank()) {
+                                    sendJoystick(JoystickType.SKILL_AIM.name, nx, ny)
+                                }
                             }
                         }
                     }
@@ -320,6 +324,8 @@ fun ControllerScreen(
         when (el.type) {
             ElementType.BUTTON -> {
                 elementStates[el.id] = ElementRuntimeState(isPressed = true)
+                // Tekan semua combo keys terlebih dahulu, baru tekan key utama
+                el.buttonConfig.comboKeys.forEach { combo -> sendButton(combo, true) }
                 sendButton(el.buttonConfig.key, true)
             }
             ElementType.JOYSTICK -> {
@@ -422,12 +428,30 @@ fun ControllerScreen(
                 val clampedX = if (dist <= maxR) rawDx else rawDx / dist * maxR
                 val clampedY = if (dist <= maxR) rawDy else rawDy / dist * maxR
                 elementStates[elId] = state.copy(joystickOffX = clampedX, joystickOffY = clampedY)
-                if (el.joystickConfig.type == JoystickType.SKILL_AIM && maxR > 0f) {
+                if (maxR > 0f) {
                     val nx = (clampedX / maxR).coerceIn(-1f, 1f)
                     val ny = -(clampedY / maxR).coerceIn(-1f, 1f)
-                    val angleDeg = Math.toDegrees(atan2(clampedY.toDouble(), clampedX.toDouble())).toFloat()
-                    val magnitude = sqrt(nx * nx + ny * ny).coerceIn(0f, 1f)
-                    sendSkillAim(el.joystickConfig.skillKey, angleDeg, magnitude, "aiming")
+
+                    if (el.joystickConfig.type == JoystickType.SKILL_AIM) {
+                        if (el.joystickConfig.skillKey.isNotBlank()) {
+                            val angleDeg = Math.toDegrees(atan2(clampedY.toDouble(), clampedX.toDouble())).toFloat()
+                            val magnitude = sqrt(nx * nx + ny * ny).coerceIn(0f, 1f)
+                            sendSkillAim(
+                                el.joystickConfig.skillKey,
+                                angleDeg,
+                                magnitude,
+                                "aiming",
+                                el.joystickConfig.aimStick,
+                                el.joystickConfig.extraKeys
+                            )
+                        } else {
+                            // Analog kanan murni (skillKey kosong): kirim sebagai right stick
+                            sendJoystick(JoystickType.SKILL_AIM.name, nx, ny)
+                        }
+                    } else {
+                        // Analog kiri (movement)
+                        sendJoystick(JoystickType.MOVEMENT.name, nx, ny)
+                    }
                 }
             }
             ElementType.TOUCHPAD -> {
@@ -512,19 +536,28 @@ fun ControllerScreen(
             ElementType.BUTTON -> {
                 elementStates[elId] = state.copy(isPressed = false)
                 sendButton(el.buttonConfig.key, false)
+                // Lepas semua combo keys
+                el.buttonConfig.comboKeys.forEach { combo -> sendButton(combo, false) }
             }
             ElementType.JOYSTICK -> {
                 if (el.joystickConfig.type == JoystickType.SKILL_AIM) {
-                    val maxR = (elementBounds[elId]?.width() ?: 1f) * 0.4f
-                    val nx   = if (maxR > 0f) (state.joystickOffX / maxR).coerceIn(-1f, 1f) else 0f
-                    val ny   = if (maxR > 0f) -(state.joystickOffY / maxR).coerceIn(-1f, 1f) else 0f
-                    val mag  = sqrt(nx * nx + ny * ny).coerceIn(0f, 1f)
-                    // BUG FIX: Always send "cast" on release, regardless of magnitude.
-                    // Old code: if (mag >= 0.1f) { ... }
-                    // This meant a light tap (mag < 0.1) would NEVER send "cast",
-                    // leaving the skill key pressed permanently on the server.
-                    val angleDeg = Math.toDegrees(atan2(state.joystickOffY.toDouble(), state.joystickOffX.toDouble())).toFloat()
-                    sendSkillAim(el.joystickConfig.skillKey, angleDeg, mag.coerceAtLeast(0.01f), "cast")
+                    if (el.joystickConfig.skillKey.isNotBlank()) {
+                        val maxR = (elementBounds[elId]?.width() ?: 1f) * 0.4f
+                        val nx   = if (maxR > 0f) (state.joystickOffX / maxR).coerceIn(-1f, 1f) else 0f
+                        val ny   = if (maxR > 0f) -(state.joystickOffY / maxR).coerceIn(-1f, 1f) else 0f
+                        val mag  = sqrt(nx * nx + ny * ny).coerceIn(0f, 1f)
+                        val angleDeg = Math.toDegrees(atan2(state.joystickOffY.toDouble(), state.joystickOffX.toDouble())).toFloat()
+                        sendSkillAim(
+                            el.joystickConfig.skillKey,
+                            angleDeg,
+                            mag.coerceAtLeast(0.01f),
+                            "cast",
+                            el.joystickConfig.aimStick,
+                            el.joystickConfig.extraKeys
+                        )
+                    } else {
+                        webSocketManager.send(gson.toJson(mapOf("type" to "joystick", "stick" to "camera", "x" to 0f, "y" to 0f)))
+                    }
                 } else {
                     webSocketManager.send(gson.toJson(mapOf("type" to "joystick", "stick" to "movement", "x" to 0f, "y" to 0f)))
                 }

@@ -1,0 +1,21 @@
+Berdasarkan pengecekan kode, aplikasi ini secara fungsional sudah berjalan dengan baik, namun ada beberapa bagian yang belum optimal dan berpotensi menyebabkan error, crash, atau masalah di masa depan. Berikut rinciannya:
+1. Masalah Fatal pada Server PC (Crash saat Ditutup)
+Saat ini, server Python akan mengalami crash (error) ketika aplikasi ditutup atau ketika mencoba menutup koneksi.
+- Penyebab: Pada file main.py dan ui/app_window.py, ada perintah untuk memanggil input_handler.shutdown(). Namun, fungsi shutdown() tidak pernah ada di dalam kelas InputHandler. Fungsi yang benar untuk menghentikan input adalah release_all().
+- Dampak: Aplikasi tidak bisa tertutup dengan sempurna dan memunculkan error AttributeError: 'InputHandler' object has no attribute 'shutdown'.
+2. Peringatan pada Aplikasi Android (Kode Tidak Efisien)
+Aplikasi Android berhasil di-compile (di-build), namun ada peringatan (warnings) dari sistem Android Jetpack Compose yang menandakan ada kode usang (deprecated) dan tidak efisien:
+- Pada layar koneksi (ConnectionScreen.kt baris 392), aplikasi menggunakan fungsi LocalLifecycleOwner yang sudah usang. Fungsi ini sudah dipindahkan ke paket (package) baru oleh Google, sehingga perlu diperbarui agar aplikasi tetap support dengan versi Android ke depannya.
+- Pada layar editor profil (ProfileEditorScreen.kt baris 143), ada kondisi pengecekan (if/else) yang selalu bernilai benar (selalu true). Ini adalah kode mubazir yang sebaiknya dihapus agar logika aplikasi lebih bersih dan ringan.
+3. Celah Kualitas dan Analisis Statis (Server PC)
+Ada beberapa masalah yang terdeteksi saat saya melakukan analisis keamanan dan kestabilan menggunakan Mypy (pemeriksa tipe data) dan Bandit (pemeriksa keamanan kode) pada server Python:
+- Penyembunyian Error (Silent Fails): Ada sangat banyak blok kode try...except Exception: pass (terutama di bagian pengontrol input dan antarmuka monitor). Ini berarti jika aplikasi gagal melakukan klik mouse atau tekan tombol, aplikasi akan menyembunyikan error tersebut tanpa mencatatnya (log). Hal ini sangat buruk untuk pelacakan bug (troubleshooting). Sebaiknya, error dicatat ke dalam log.
+- Tipe Data Tidak Konsisten: Pada core/config_manager.py, ada beberapa variabel pengaturan (settings) yang seharusnya bertipe angka (integer/float), tetapi tersimpan sebagai teks (string). Ini berisiko menyebabkan error saat perhitungan sensitivitas atau posisi aim.
+- Generate QR Code Usang: Pembuatan QR Code menggunakan LANCZOS dari pustaka Pillow yang lama. Pustaka Pillow terbaru mengharuskan menggunakan Image.Resampling.LANCZOS. Jika tidak diperbaiki, fitur scan QR bisa gagal di masa depan.
+- Event Loop WebSocket: Pada bagian websocket_server.py, pemanggilan fungsi asinkron (koneksi websocket) kurang aman karena sistem memanggil fungsi run_until_complete tanpa memastikan apakah loop-nya sudah siap atau belum.
+Rencana Optimalisasi (Plan)
+Karena saat ini saya dalam mode Perencanaan (Plan Mode), saya tidak akan mengubah file apa pun terlebih dahulu. Jika Anda setuju untuk melanjutkan ke tahap perbaikan, berikut adalah rencana optimalisasinya:
+1. Memperbaiki Crash Server: Mengubah perintah shutdown() menjadi release_all() di main.py dan app_window.py.
+2. Membersihkan Peringatan Android: Memperbaiki impor LocalLifecycleOwner yang sudah usang dan menghapus logika berlebih di Android App.
+3. Menambal Bug Tipe Data & QR Code: Memperbaiki cara pemanggilan LANCZOS pada QR Generator dan merapikan tipe data (Type Hints) di server.
+4. Menambahkan Log pada Error: Mengganti semua fungsi penyembunyi error (pass) dengan pencatatan log agar masalah lebih mudah dilacak.

@@ -63,6 +63,17 @@ class WebSocketServer:
         # hasn't moved. Caching last (x, y) per stick and skipping duplicate
         # messages reduces InputHandler + UI log work by up to 90% when idle.
         self._last_joystick: dict = {}   # stick_name -> (x, y)
+        self._last_skill: dict = {}      # action -> (angle, mag, state)
+        self._log_throttles: dict = {}   # type -> next_log_time
+
+    def _should_log(self, log_key: str, throttle_sec: float = 0.5) -> bool:
+        """Limits logging frequency for high-spam events to save CPU/UI updates."""
+        now = time.time()
+        next_time = self._log_throttles.get(log_key, 0)
+        if now >= next_time:
+            self._log_throttles[log_key] = now + throttle_sec
+            return True
+        return False
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -158,11 +169,16 @@ class WebSocketServer:
 
         # ── Joystick ────────────────────────────────────────────────────────────
         if msg_type == "joystick":
-            # SYNC FIX: Android sends stick="movement" for the movement joystick.
-            # InputHandler.process_joystick expects stick=="left" to process WASD.
-            # Map "movement" → "left" so the handler fires correctly.
+            # SYNC FIX: Android sends stick="movement" (left) and skill_aim sends via skill_aim event.
+            # But just in case, we accept "movement" or "left" or "camera" or "right"
             stick_raw = data.get("stick", "left")
-            stick = "left" if stick_raw in ("movement", "left") else stick_raw
+            if stick_raw == "movement":
+                stick = "left"
+            elif stick_raw == "camera":
+                stick = "right"
+            else:
+                stick = stick_raw
+                
             x = float(data.get("x", 0.0))
             y = float(data.get("y", 0.0))
 
@@ -174,10 +190,11 @@ class WebSocketServer:
                 return  # identical to last frame, nothing to do
             self._last_joystick[stick] = (x, y)
 
-            self._log(
-                f"{'left' if stick == 'left' else 'right':4s}  x:{x:+.2f} y:{y:+.2f}",
-                "joystick"
-            )
+            if self._should_log(f"joystick_{stick}"):
+                self._log(
+                    f"{'left' if stick == 'left' else 'right':4s}  x:{x:+.2f} y:{y:+.2f}",
+                    "joystick"
+                )
             if self.input_handler:
                 self.input_handler.process_joystick(stick, x, y)
 
@@ -203,7 +220,10 @@ class WebSocketServer:
         elif msg_type in ("mouse_move", "mouse"):
             dx = float(data.get("dx", 0.0))
             dy = float(data.get("dy", 0.0))
-            self._log(f"move  dx:{dx:+.1f} dy:{dy:+.1f}", "mouse")
+            if dx == 0 and dy == 0:
+                return
+            if self._should_log("mouse_move", throttle_sec=0.2):
+                self._log(f"move  dx:{dx:+.1f} dy:{dy:+.1f}", "mouse")
             if self.input_handler:
                 self.input_handler.process_mouse(dx, dy)
 
@@ -234,12 +254,24 @@ class WebSocketServer:
             angle     = float(data.get("angle", 0.0))
             magnitude = float(data.get("magnitude", 0.0))
             state     = data.get("state", "cast")
-            self._log(
-                f"{action:<8} [{state:<6}] angle:{angle:.0f}° mag:{magnitude:.2f}",
-                "button"
-            )
+            aim_stick = data.get("aimStick", "mouse")   # "mouse", "right", "left"
+            extra_keys = data.get("extraKeys", [])       # list of extra buttons to hold
+            
+            # Deduplicate skill aim events
+            prev_skill = self._last_skill.get(action)
+            if prev_skill is not None and state == "aiming":
+                p_angle, p_mag, p_state = prev_skill
+                if p_state == "aiming" and abs(p_angle - angle) < 1.0 and abs(p_mag - magnitude) < 0.01:
+                    return
+            self._last_skill[action] = (angle, magnitude, state)
+            
+            if self._should_log(f"skill_{action}") or state == "cast":
+                self._log(
+                    f"{action:<8} [{state:<6}] angle:{angle:.0f} deg mag:{magnitude:.2f} aim:{aim_stick}",
+                    "button"
+                )
             if self.input_handler:
-                self.input_handler.process_skill_aim(action, angle, magnitude, state)
+                self.input_handler.process_skill_aim(action, angle, magnitude, state, aim_stick, extra_keys)
 
         # ── Profile sync ────────────────────────────────────────────────────────
         elif msg_type == "profile":

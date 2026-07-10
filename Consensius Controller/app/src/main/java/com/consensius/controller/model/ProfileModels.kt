@@ -22,12 +22,23 @@ object ElementDefaults {
 // ─── Element Config (per-type) ────────────────────────────────────────────────
 
 data class ButtonElementConfig(
-    val key: String = "k"
+    val key: String = "k",
+    // Combo: tombol tambahan yang ditekan BERSAMAAN saat tombol ini ditekan
+    // Contoh: key="space", comboKeys=["rb"] -> tekan RB+Space bersamaan
+    val comboKeys: List<String> = emptyList()
 )
 
 data class JoystickElementConfig(
     val type: JoystickType = JoystickType.MOVEMENT,
-    val skillKey: String   = ""  // only when type == SKILL_AIM
+    // Untuk SKILL_AIM: tombol yang ditahan saat aim (bisa gamepad atau keyboard)
+    // Contoh: "rb", "rt", "lb", "lt", "y", "x", "j", "k", dll
+    val skillKey: String = "",
+    // Untuk SKILL_AIM: stick mana yang digerak saat aim
+    // "right" = right stick vgamepad, "left" = left stick vgamepad, "mouse" = gerak mouse (mode lama)
+    val aimStick: String = "mouse",
+    // Tombol tambahan yang ditekan bersamaan saat skill aim (selain skillKey)
+    // Contoh: skillKey="rb", extraKeys=["x"] -> tahan RB+X bersamaan saat aim
+    val extraKeys: List<String> = emptyList()
 )
 
 data class DpadElementConfig(

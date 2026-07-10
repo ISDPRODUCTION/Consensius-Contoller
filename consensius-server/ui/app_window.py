@@ -122,8 +122,7 @@ class AppWindow(ctk.CTk):
             sidebar, text="[STOPPED]",
             font=("Consolas", 10, "bold"), text_color=ERROR
         )
-        self._status_chip.grid(row=len(NAV_ITEMS) + 2, column=0,
-                               pady=(0, 16), padx=12, sticky="s")
+        self._status_chip.grid(row=len(NAV_ITEMS) + 2, column=0,pady=(0, 16), padx=12, sticky="s")
 
         # ── Page container ───────────────────────────────────────────────────
         self._page_frame = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
@@ -288,6 +287,17 @@ class AppWindow(ctk.CTk):
         self._input_handler.update_settings(new_settings)
 
     # ── Close ──────────────────────────────────────────────────────────────────
+
+    def mainloop(self, *args, **kwargs):
+        """Runs the CustomTkinter main loop safely."""
+        try:
+            super().mainloop(*args, **kwargs)
+        except KeyboardInterrupt:
+            print("[INFO] Application closed via KeyboardInterrupt.")
+            self._on_close()
+        except Exception as e:
+            print(f"[ERROR] Exception in mainloop: {e}")
+            self._on_close()
 
     def _on_close(self):
         self._server.stop()

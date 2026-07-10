@@ -19,9 +19,49 @@ class ProfileManager:
         if not self.profiles_dir.exists():
             logger.warning(f"Profiles directory not found at {self.profiles_dir}. Creating directory.")
             self.profiles_dir.mkdir(parents=True, exist_ok=True)
-            return {}
-
+            
         loaded_profiles = {}
+        # Ensure default xbox360 profile exists
+        xbox_path = self.profiles_dir / "xbox360.json"
+        if not xbox_path.exists():
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            xbox_profile = Profile(
+                id="xbox360",
+                name="Xbox 360 (Virtual Gamepad)",
+                bindings={
+                    "a": "a",
+                    "b": "b",
+                    "x": "x",
+                    "y": "y",
+                    "lb": "lb",
+                    "rb": "rb",
+                    "lt": "lt",
+                    "rt": "rt",
+                    "back": "back",
+                    "start": "start",
+                    "l3": "l3",
+                    "r3": "r3",
+                    "dpad_up": "dpad_up",
+                    "dpad_down": "dpad_down",
+                    "dpad_left": "dpad_left",
+                    "dpad_right": "dpad_right"
+                },
+                controller=ProfileControllerSettings(
+                    deadzone=0.25,
+                    sensitivity=1.0,
+                    send_rate=60
+                ),
+                metadata=ProfileMetadata(
+                    created_at=now_str,
+                    updated_at=now_str
+                )
+            )
+            try:
+                with open(xbox_path, "w", encoding="utf-8") as f:
+                    json.dump(xbox_profile.to_dict(), f, indent=2)
+            except Exception as e:
+                logger.error(f"Failed to create default xbox360 profile: {e}")
+
         for file_path in self.profiles_dir.glob("*.json"):
             profile_id = file_path.stem
             try:
@@ -100,6 +140,10 @@ class ProfileManager:
 
     def delete_profile(self, profile_id: str) -> bool:
         """Deletes a profile if it exists and is not active."""
+        if profile_id == "xbox360":
+            logger.error("Cannot delete the permanent xbox360 profile.")
+            return False
+
         if profile_id == self.active_profile_key:
             logger.error("Cannot delete the active profile.")
             return False

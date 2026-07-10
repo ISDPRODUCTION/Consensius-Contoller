@@ -185,7 +185,7 @@ fun SettingsScreen(
                         SectionHeader(text = "ABOUT")
                         Spacer(Modifier.height(16.dp))
 
-                        AboutItem(icon = Icons.Default.Gamepad, label = "Application", value = "Consensius Controller v1.0")
+                        AboutItem(icon = Icons.Default.Gamepad, label = "Application", value = "Consensius Controller v2.0")
                         Spacer(Modifier.height(4.dp))
                         GlassDivider()
                         Spacer(Modifier.height(4.dp))

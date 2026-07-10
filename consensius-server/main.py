@@ -98,8 +98,22 @@ def main():
     server.input_handler = input_handler
 
     # Launch UI (blocks until window is closed)
-    app = AppWindow(server, input_handler, settings)
-    app.mainloop()
+    try:
+        app = AppWindow(server, input_handler, settings)
+        app.mainloop()
+    except KeyboardInterrupt:
+        print("[INFO] Server dihentikan oleh pengguna.")
+    finally:
+        server.stop()
+        if hasattr(input_handler, "release_all"):
+            input_handler.release_all()
+        # Also clean up vgamepad if it was used
+        if hasattr(input_handler, "_gamepad") and input_handler._gamepad is not None:
+            try:
+                input_handler._gamepad.reset()
+                input_handler._gamepad.update()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

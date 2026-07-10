@@ -22,6 +22,12 @@ import ctypes
 from typing import Set
 
 try:
+    import vgamepad as vg
+    VGAMEPAD_AVAILABLE = True
+except ImportError:
+    VGAMEPAD_AVAILABLE = False
+
+try:
     from pynput.keyboard import Controller as KeyboardController, Key
     from pynput.mouse import Controller as MouseController
     PYNPUT_AVAILABLE = True
@@ -78,6 +84,37 @@ class InputHandler:
             self._keyboard = None
             self._mouse    = None
 
+        if VGAMEPAD_AVAILABLE:
+            try:
+                self._gamepad = vg.VX360Gamepad()
+            except Exception as e:
+                print(f"[WARN] Failed to initialize virtual gamepad: {e}")
+                self._gamepad = None
+        else:
+            self._gamepad = None
+            print("[WARN] vgamepad not available. Virtual Xbox 360 controller disabled.")
+
+        # VGamepad button mappings
+        if VGAMEPAD_AVAILABLE:
+            self._vgamepad_button_map = {
+                "a": vg.XUSB_BUTTON.XUSB_GAMEPAD_A,
+                "b": vg.XUSB_BUTTON.XUSB_GAMEPAD_B,
+                "x": vg.XUSB_BUTTON.XUSB_GAMEPAD_X,
+                "y": vg.XUSB_BUTTON.XUSB_GAMEPAD_Y,
+                "lb": vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_SHOULDER,
+                "rb": vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_SHOULDER,
+                "lt": "LT", # handled as trigger
+                "rt": "RT", # handled as trigger
+                "back": vg.XUSB_BUTTON.XUSB_GAMEPAD_BACK,
+                "start": vg.XUSB_BUTTON.XUSB_GAMEPAD_START,
+                "l3": vg.XUSB_BUTTON.XUSB_GAMEPAD_LEFT_THUMB,
+                "r3": vg.XUSB_BUTTON.XUSB_GAMEPAD_RIGHT_THUMB,
+                "dpad_up": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_UP,
+                "dpad_down": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_DOWN,
+                "dpad_left": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_LEFT,
+                "dpad_right": vg.XUSB_BUTTON.XUSB_GAMEPAD_DPAD_RIGHT
+            }
+
         # Bug 2: Use set() to track held keys — prevents duplicate press/release.
         # press_key() only calls pynput if key NOT already in set.
         # release_key() only calls pynput if key IS in set.
@@ -114,55 +151,53 @@ class InputHandler:
 
     def process_joystick(self, stick: str, x: float, y: float) -> None:
         """
-        Converts left joystick XY into WASD keypresses.
-
-        Bug JOYSTICK-MOVE fix:
-          Android already sends game-space Y:
-            ny = -(joystickOffY / maxR)  → positive Y means joystick pushed UP (forward)
-          So DO NOT invert Y here — that would cause a double-invert and
-          W/S would never trigger. Use Y directly as received from Android.
-
-        Bug 10 fix: Computes the FULL new required set of WASD keys, then:
-          - Releases any key in pressed_wasd NOT in new_required
-          - Presses any key in new_required NOT already in pressed_wasd
-        This guarantees diagonal keys are released when moving back to single axis.
+        Converts left/right joystick XY into vgamepad left/right joystick movements.
+        For backwards compatibility or specific profiles, it can also map to WASD, 
+        but vgamepad is preferred.
         """
-        if stick != "left":
+        if stick not in ("left", "right"):
             return
 
-        threshold = self._settings.get("joystick_threshold", 0.3)
-
-        # Bug JOYSTICK-MOVE FIX: Do NOT invert Y.
-        # Android sends: ny = -(joystickOffY / maxR) — already in game-space
-        # where positive Y = forward (up) and negative Y = backward (down).
-        # Inverting here again would make W/S never register.
-        # (The old invert_y flag was designed for a different Android convention.)
-
-        # Compute the full set of keys that should be pressed right now
-        new_required: Set[str] = set()
-        if y > threshold:
-            new_required.add("w")   # positive Y = forward
-        if y < -threshold:
-            new_required.add("s")   # negative Y = backward
-        if x > threshold:
-            new_required.add("d")   # positive X = right
-        if x < -threshold:
-            new_required.add("a")   # negative X = left
-
         with self._lock:
-            # Release any WASD key no longer needed
-            for key in list(self._pressed_wasd):
-                if key not in new_required:
-                    self._raw_release(key)
-                    self._pressed_wasd.discard(key)
-                    self._pressed_keys.discard(key)
+            if self._gamepad:
+                val_x = float(x)
+                # Android UI: Y positif = jari ke atas (sudah dibalik di ControllerScreen: -(rawNy))
+                # vgamepad/XInput: Y positif = analog ke atas
+                # Jadi tidak perlu invert lagi di sini
+                val_y = float(y)
 
-            # Press any newly required key not yet held
-            for key in new_required:
-                if key not in self._pressed_wasd:
-                    self._raw_press(key)
-                    self._pressed_wasd.add(key)
-                    self._pressed_keys.add(key)
+                if stick == "left":
+                    self._gamepad.left_joystick_float(x_value_float=val_x, y_value_float=val_y)
+                elif stick == "right":
+                    self._gamepad.right_joystick_float(x_value_float=val_x, y_value_float=val_y)
+                
+                self._gamepad.update()
+                
+            else:
+                # Fallback to WASD for left joystick ONLY if gamepad is NOT available
+                if stick == "left":
+                    threshold = self._settings.get("joystick_threshold", 0.3)
+                    new_required: Set[str] = set()
+                    if y > threshold:
+                        new_required.add("w")
+                    if y < -threshold:
+                        new_required.add("s")
+                    if x > threshold:
+                        new_required.add("d")
+                    if x < -threshold:
+                        new_required.add("a")
+
+                    for key in list(self._pressed_wasd):
+                        if key not in new_required:
+                            self._raw_release(key)
+                            self._pressed_wasd.discard(key)
+                            self._pressed_keys.discard(key)
+
+                    for key in new_required:
+                        if key not in self._pressed_wasd:
+                            self._raw_press(key)
+                            self._pressed_wasd.add(key)
+                            self._pressed_keys.add(key)
 
     # ── Mouse movement ────────────────────────────────────────────────────────
 
@@ -210,10 +245,23 @@ class InputHandler:
 
         # ── Regular keyboard key ────────────────────────────────────────
         with self._lock:
-            if is_down:
-                self._press_key(key_str)
+            if self._gamepad and key_str.lower() in self._vgamepad_button_map:
+                v_btn = self._vgamepad_button_map[key_str.lower()]
+                if v_btn == "LT":
+                    self._gamepad.left_trigger(value=255 if is_down else 0)
+                elif v_btn == "RT":
+                    self._gamepad.right_trigger(value=255 if is_down else 0)
+                else:
+                    if is_down:
+                        self._gamepad.press_button(button=v_btn)
+                    else:
+                        self._gamepad.release_button(button=v_btn)
+                self._gamepad.update()
             else:
-                self._release_key(key_str)
+                if is_down:
+                    self._press_key(key_str)
+                else:
+                    self._release_key(key_str)
 
     def process_dpad(self, key_str: str, state: str) -> None:
         """D-Pad is treated identically to a button."""
@@ -221,28 +269,65 @@ class InputHandler:
 
     # ── Skill + Aim ───────────────────────────────────────────────────────────
 
-    def process_skill_aim(self, action: str, angle: float, magnitude: float, state: str = "cast") -> None:
+    def process_skill_aim(self, action: str, angle: float, magnitude: float, state: str = "cast",
+                          aim_stick: str = "mouse", extra_keys: list = None) -> None:
         """
-        Skill aim: press-and-hold key on first "aiming", track cursor, release on "cast".
+        Skill aim dengan 3 mode:
+          - aim_stick="mouse"  → gerak mouse + tekan key keyboard (mode lama)
+          - aim_stick="right"  → tahan tombol gamepad + gerak right stick vgamepad
+          - aim_stick="left"   → tahan tombol gamepad + gerak left stick vgamepad
 
-        BUG-STUCK FIX (2 root causes fixed):
-
-        Root Cause #1 — Android skips sending "cast" when drag magnitude < 0.1
-          The Android code has:  if (mag >= 0.1f) { sendSkillAim(..., "cast") }
-          So a light tap on the skill joystick sends "aiming" (key pressed) but
-          NEVER sends "cast" (key never released) → key stuck held indefinitely.
-
-        Root Cause #2 — Stale _held_skill_keys from a previous aborted session
-          If cast was never received, _held_skill_keys[action] still exists on the
-          next session. The old code then skips the press entirely (action already
-          in dict) → key never pressed → skill does nothing → user presses again.
-
-        Fix:
-          - On "aiming" when action is ALREADY in _held_skill_keys: force-close the
-            stale session (release old key, restore cursor) then start a fresh one.
-          - On "cast": always pop ALL state dicts for the action before doing anything,
-            guaranteeing no orphaned state survives regardless of exceptions.
+        extra_keys: tombol tambahan yang ditekan bersamaan (misal ["x"] untuk RB+X)
         """
+        if extra_keys is None:
+            extra_keys = []
+
+        scaled_magnitude = magnitude ** 0.7 if magnitude > 0 else 0.0
+        angle_rad = math.radians(angle)
+
+        # ── MODE GAMEPAD STICK (aimStick = "right" atau "left") ─────────────
+        if aim_stick in ("right", "left") and self._gamepad:
+            with self._lock:
+                v_btn = self._vgamepad_button_map.get(action.lower()) if action else None
+
+                if state == "aiming":
+                    # Tekan tombol utama (skillKey) jika belum ditekan
+                    if action not in self._held_skill_keys:
+                        self._press_gamepad_button(v_btn)
+                        # Tekan extra keys
+                        for ek in extra_keys:
+                            ek_btn = self._vgamepad_button_map.get(ek.lower())
+                            self._press_gamepad_button(ek_btn)
+                        self._held_skill_keys[action] = action
+                        self._skill_aim_active.add(action)
+
+                    # Gerak stick sesuai angle dan magnitude
+                    rx = float(math.cos(angle_rad) * scaled_magnitude)
+                    ry = float(-math.sin(angle_rad) * scaled_magnitude)
+                    if aim_stick == "right":
+                        self._gamepad.right_joystick_float(x_value_float=rx, y_value_float=ry)
+                    else:
+                        self._gamepad.left_joystick_float(x_value_float=rx, y_value_float=ry)
+                    self._gamepad.update()
+
+                elif state == "cast":
+                    self._skill_aim_active.discard(action)
+                    self._held_skill_keys.pop(action, None)
+                    # Lepas tombol utama
+                    self._release_gamepad_button(v_btn)
+                    # Lepas extra keys
+                    for ek in extra_keys:
+                        ek_btn = self._vgamepad_button_map.get(ek.lower())
+                        self._release_gamepad_button(ek_btn)
+                    # Reset stick
+                    if aim_stick == "right":
+                        self._gamepad.right_joystick_float(x_value_float=0.0, y_value_float=0.0)
+                    else:
+                        self._gamepad.left_joystick_float(x_value_float=0.0, y_value_float=0.0)
+                    self._gamepad.update()
+            return
+
+        # ── MODE MOUSE (aimStick = "mouse") ─────────────────────────────────
         if not PYNPUT_AVAILABLE or self._keyboard is None:
             return
         key = _resolve_key(action)
@@ -251,53 +336,29 @@ class InputHandler:
 
         max_px = float(self._settings.get("skill_aim_distance", 300))
         max_px = max(max_px, 50.0)
-        scaled_magnitude = magnitude ** 0.7 if magnitude > 0 else 0.0
-        angle_rad = math.radians(angle)
         aim_dx = int(math.cos(angle_rad) * scaled_magnitude * max_px)
         aim_dy = int(math.sin(angle_rad) * scaled_magnitude * max_px)
 
         with self._lock:
             if state == "aiming":
-
-                # ── BUG AIM-SESSION: Detect TRUE stale sessions only ─────────
-                # Old code checked `if action in self._held_skill_keys`, but this
-                # fires on EVERY "aiming" frame (60fps) because the key was pressed
-                # in the first frame and stays in _held_skill_keys throughout the
-                # drag. This caused:
-                #   1. Key release/press 60 times/second
-                #   2. Origin overwritten with cursor's already-moved position
-                #   3. Center constantly reset → aim stutter
-                #
-                # Fix: A stale session = key held AND NOT in _skill_aim_active.
-                # Once a session starts, _skill_aim_active is set and cleared on
-                # "cast", so only truly orphaned sessions trigger the stale path.
+                # Deteksi sesi stale (key masih tertahan dari sesi sebelumnya)
                 if action in self._held_skill_keys and action not in self._skill_aim_active:
-                    # ── BUG-STUCK FIX Root Cause #2: stale session still open ──
-                    # A prior "cast" was never received (e.g. Android mag < 0.1
-                    # threshold suppressed it). Force-close the orphaned session first
-                    # so the new press always works correctly.
                     stale_key = self._held_skill_keys.pop(action)
                     try:
                         self._keyboard.release(stale_key)
                     except Exception:
                         pass
-                    # Pop stale state silently — discard to prevent cursor jump.
                     self._skill_aim_origin.pop(action, None)
                     self._skill_aim_center.pop(action, None)
 
-                # ── First-time setup: save initial state ────────────────────
+                # Setup awal sesi baru
                 if action not in self._skill_aim_active:
                     self._skill_aim_active.add(action)
-
-                    # Save current cursor position BEFORE moving (restored on cast)
                     if self._mouse:
                         try:
-                            origin_pos = self._mouse.position
-                            self._skill_aim_origin[action] = origin_pos
+                            self._skill_aim_origin[action] = self._mouse.position
                         except Exception:
                             self._skill_aim_origin[action] = (0, 0)
-
-                    # Determine aim pivot (configured position or screen centre)
                     skill_positions = self._settings.get("skill_positions", {})
                     pos_cfg = skill_positions.get(action, {})
                     px = pos_cfg.get("x", -1) if isinstance(pos_cfg, dict) else -1
@@ -308,16 +369,7 @@ class InputHandler:
                         sw, sh = self._screen_size if self._screen_size[0] > 0 else (1920, 1080)
                         self._skill_aim_center[action] = (sw // 2, sh // 2)
 
-                # ═══ BUG ORDER-FIX: Move cursor FIRST, then press key ═══
-                # CRITICAL: The game reads the cursor position WHEN the key
-                # is pressed (key down event), not continuously. If we press
-                # the key FIRST and then move the cursor, the game sees the
-                # OLD cursor position (e.g. center of screen), not the aim
-                # position. This makes the skill fire in the wrong direction.
-                #
-                # Fix: Always move cursor to the aim position BEFORE pressing
-                # the key. On the initial frame, cursor moves → then key
-                # presses. On subsequent frames, cursor keeps updating.
+                # Gerak cursor ke posisi aim SEBELUM tekan key
                 center = self._skill_aim_center.get(action)
                 if self._mouse and center:
                     try:
@@ -325,7 +377,7 @@ class InputHandler:
                     except Exception:
                         pass
 
-                # ── Press key (cursor is ALREADY at aim position now) ─────
+                # Tekan key (cursor sudah di posisi yang benar)
                 if action not in self._held_skill_keys:
                     try:
                         self._keyboard.press(key)
@@ -334,47 +386,32 @@ class InputHandler:
                         pass
 
             elif state == "cast":
-                # Mark session as ended BEFORE popping state
                 self._skill_aim_active.discard(action)
-
-                # ── BUG-STUCK FIX Root Cause #1: always pop ALL state first ──
-                # Pop everything before acting so no orphaned state survives even
-                # if an exception occurs mid-cast (e.g. pynput error).
                 center   = self._skill_aim_center.pop(action, None)
                 origin   = self._skill_aim_origin.pop(action, None)
                 held_key = self._held_skill_keys.pop(action, None)
 
-                # 1. Move cursor to final aimed position
+                # Gerak cursor ke posisi final
                 if self._mouse and center:
                     try:
                         self._mouse.position = (center[0] + aim_dx, center[1] + aim_dy)
                     except Exception:
                         pass
 
-                # 2. Release held key (or tap if session was somehow skipped)
+                # Lepas key
                 if held_key is not None:
                     try:
                         self._keyboard.release(held_key)
                     except Exception:
                         pass
                 else:
-                    # Fallback: no held key — quick tap at current position
                     try:
                         self._keyboard.press(key)
                         self._keyboard.release(key)
                     except Exception:
                         pass
 
-                # ── BUG CURSOR-FIX: Restore cursor to origin ─────────────────
-                # Old code had a double-pop bug: origin was popped at the top
-                # and then popped AGAIN here (returning None), so cursor was
-                # NEVER restored. Fixed by using the origin from the first pop.
-                # This ensures cursor returns to the position BEFORE aiming,
-                # so subsequent clicks (e.g. fire button via touchpad) happen
-                # at the correct pre-aim location.
-                #
-                # Note: _skill_aim_center was already popped above — no need
-                # to pop again.
+                # Kembalikan cursor ke posisi semula
                 if self._mouse and origin is not None:
                     try:
                         self._mouse.position = origin
@@ -428,6 +465,11 @@ class InputHandler:
         Also clears pressed_wasd set and held skill keys.
         """
         with self._lock:
+            # Release gamepad buttons
+            if self._gamepad:
+                self._gamepad.reset()
+                self._gamepad.update()
+                
             for key_str in list(self._pressed_keys):
                 self._raw_release(key_str)
             self._pressed_keys.clear()
@@ -436,9 +478,11 @@ class InputHandler:
             # Bug SKILL-HOLD: Release any skill keys that are still held on disconnect.
             for action, held_key in list(self._held_skill_keys.items()):
                 try:
-                    if self._keyboard:
+                    if self._gamepad and action.lower() in self._vgamepad_button_map:
+                        pass # handled by gamepad.reset()
+                    elif self._keyboard:
                         self._keyboard.release(held_key)
-                        # Fix #5: removed print() — not needed at disconnect
+                        # Fix #5: removed print() ?" not needed at disconnect
                 except Exception:
                     pass
             self._held_skill_keys.clear()
@@ -458,6 +502,34 @@ class InputHandler:
             # Note: _held_skill_keys is also cleared above in the SKILL-HOLD block.
 
     # ── Internal helpers ──────────────────────────────────────────────────────
+
+    def _press_gamepad_button(self, v_btn) -> None:
+        """Tekan satu tombol vgamepad. Caller harus pegang lock."""
+        if v_btn is None or self._gamepad is None:
+            return
+        try:
+            if v_btn == "LT":
+                self._gamepad.left_trigger(value=255)
+            elif v_btn == "RT":
+                self._gamepad.right_trigger(value=255)
+            else:
+                self._gamepad.press_button(button=v_btn)
+        except Exception:
+            pass
+
+    def _release_gamepad_button(self, v_btn) -> None:
+        """Lepas satu tombol vgamepad. Caller harus pegang lock."""
+        if v_btn is None or self._gamepad is None:
+            return
+        try:
+            if v_btn == "LT":
+                self._gamepad.left_trigger(value=0)
+            elif v_btn == "RT":
+                self._gamepad.right_trigger(value=0)
+            else:
+                self._gamepad.release_button(button=v_btn)
+        except Exception:
+            pass
 
     def _press_key(self, key_str: str) -> None:
         """

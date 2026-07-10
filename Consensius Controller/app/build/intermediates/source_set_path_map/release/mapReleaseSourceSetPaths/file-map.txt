@@ -1,0 +1,66 @@
+com.consensius.controller.app-lifecycle-viewmodel-release-0 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\0bf8ebefe6b9eed35fa0ca61284aec58\transformed\lifecycle-viewmodel-release\res
+com.consensius.controller.app-animation-core-release-1 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\0df52da270a41f7f93bf0d1b414a9f6f\transformed\animation-core-release\res
+com.consensius.controller.app-datastore-preferences-release-2 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\0e786f8f86a7406229ea4ccf125059cd\transformed\datastore-preferences-release\res
+com.consensius.controller.app-material-icons-extended-release-3 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\120ac7226b43ba4522e83f047e03c555\transformed\material-icons-extended-release\res
+com.consensius.controller.app-lifecycle-runtime-release-4 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\1c99ad797ed09266946701562fa797d6\transformed\lifecycle-runtime-release\res
+com.consensius.controller.app-foundation-layout-release-5 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\1cbe68b09ccd60036408d3126e7ffab8\transformed\foundation-layout-release\res
+com.consensius.controller.app-lifecycle-process-2.8.3-6 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\2307878fb48382882c6fa87c6520c73d\transformed\lifecycle-process-2.8.3\res
+com.consensius.controller.app-material3-release-7 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\25becfab2b06ec3995f30a660757ad08\transformed\material3-release\res
+com.consensius.controller.app-ui-graphics-release-8 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\28724f61dce166d4f97a15a4467727dc\transformed\ui-graphics-release\res
+com.consensius.controller.app-customview-poolingcontainer-1.0.0-9 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\330ec47855439981cd22395c31094399\transformed\customview-poolingcontainer-1.0.0\res
+com.consensius.controller.app-savedstate-1.2.1-10 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\33c5ccdc4201f607d77c96d3fbca6516\transformed\savedstate-1.2.1\res
+com.consensius.controller.app-ui-unit-release-11 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\3e1b847ac1307583e406fc8b6f686378\transformed\ui-unit-release\res
+com.consensius.controller.app-lifecycle-viewmodel-savedstate-2.8.3-12 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\3f272cdf2662ab29ac8ac18a9c63192f\transformed\lifecycle-viewmodel-savedstate-2.8.3\res
+com.consensius.controller.app-ui-geometry-release-13 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\3f277a040fa9830d6e527aea7c70fdd7\transformed\ui-geometry-release\res
+com.consensius.controller.app-ui-text-release-14 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\411389220dd3aec47cb95ab457541872\transformed\ui-text-release\res
+com.consensius.controller.app-play-services-basement-18.1.0-15 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\451969f1fe8eedbb4a67273a3a441a80\transformed\play-services-basement-18.1.0\res
+com.consensius.controller.app-navigation-compose-2.8.9-16 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\46129ad83b6e16c7c9298b213770c7f7\transformed\navigation-compose-2.8.9\res
+com.consensius.controller.app-appcompat-1.1.0-17 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\5587d4829c9b49369cec9bb67f4cb937\transformed\appcompat-1.1.0\res
+com.consensius.controller.app-runtime-saveable-release-18 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\56b17fd323a14d97d912e92f23ea28cf\transformed\runtime-saveable-release\res
+com.consensius.controller.app-lifecycle-viewmodel-ktx-2.8.3-19 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\5ceba5993e2e06042404eae34891fc06\transformed\lifecycle-viewmodel-ktx-2.8.3\res
+com.consensius.controller.app-lifecycle-runtime-compose-release-20 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\5d88b4b4860862c28f72ef1e1adb2b79\transformed\lifecycle-runtime-compose-release\res
+com.consensius.controller.app-savedstate-ktx-1.2.1-21 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\60906ecf600f206515258e19644ade5e\transformed\savedstate-ktx-1.2.1\res
+com.consensius.controller.app-material-ripple-release-22 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\6108ed15e760c7c6074057af645878e0\transformed\material-ripple-release\res
+com.consensius.controller.app-camera-video-1.3.0-23 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\6690fc859c4e3d5a5a1915bb10c85e95\transformed\camera-video-1.3.0\res
+com.consensius.controller.app-navigation-common-ktx-2.8.9-24 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\69856dd586ff433ed292f02a02cafd90\transformed\navigation-common-ktx-2.8.9\res
+com.consensius.controller.app-material-icons-core-release-25 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\6c144e22aecae4526d02e871742e0e41\transformed\material-icons-core-release\res
+com.consensius.controller.app-activity-compose-1.9.0-26 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\7015be34ff29ecded2b4cf04145faba8\transformed\activity-compose-1.9.0\res
+com.consensius.controller.app-lifecycle-livedata-2.8.3-27 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\70603f3212c5913abe3d188d8a7232ae\transformed\lifecycle-livedata-2.8.3\res
+com.consensius.controller.app-camera-lifecycle-1.3.0-28 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\71fb1279e8c7983ae398c1c46a6e4f91\transformed\camera-lifecycle-1.3.0\res
+com.consensius.controller.app-profileinstaller-1.3.1-29 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\76f475c1f53258468474c62bfe8d36a7\transformed\profileinstaller-1.3.1\res
+com.consensius.controller.app-activity-ktx-1.9.0-30 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\7e335e384378d8a0548351f1a947c44b\transformed\activity-ktx-1.9.0\res
+com.consensius.controller.app-core-1.13.1-31 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\87ceaccd7534985fa625cec97fb85332\transformed\core-1.13.1\res
+com.consensius.controller.app-core-ktx-1.13.1-32 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\8804e7096b0413ebba7b9e9cf3ae7100\transformed\core-ktx-1.13.1\res
+com.consensius.controller.app-lifecycle-runtime-ktx-release-33 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\8a9d2b8f960ab2573a655bcd27e82b15\transformed\lifecycle-runtime-ktx-release\res
+com.consensius.controller.app-lifecycle-livedata-core-ktx-2.8.3-34 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\8bcb3754c5296ba0226a0ed79736b90f\transformed\lifecycle-livedata-core-ktx-2.8.3\res
+com.consensius.controller.app-camera-camera2-1.3.0-35 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\8d1cb2949f27ff2e280bfb511a01970f\transformed\camera-camera2-1.3.0\res
+com.consensius.controller.app-navigation-runtime-2.8.9-36 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\8f04769fba8980ffa1b402e67eee6e60\transformed\navigation-runtime-2.8.9\res
+com.consensius.controller.app-graphics-path-1.0.1-37 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\9357c2ecf99e0a49de4d2279e7e85a93\transformed\graphics-path-1.0.1\res
+com.consensius.controller.app-activity-1.9.0-38 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\96e3f86ae459446a622ada99d399530c\transformed\activity-1.9.0\res
+com.consensius.controller.app-annotation-experimental-1.4.1-39 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\9798f38fe523e8fbedc092d8b1f34ece\transformed\annotation-experimental-1.4.1\res
+com.consensius.controller.app-camera-core-1.3.0-40 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\9a1053115a16a26581c786dec4871769\transformed\camera-core-1.3.0\res
+com.consensius.controller.app-ui-tooling-preview-release-41 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\9e2dcb46d6612f9f91f50cc34279e4b9\transformed\ui-tooling-preview-release\res
+com.consensius.controller.app-startup-runtime-1.1.1-42 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\a192c22ddb2158608887c6c5a4bddda8\transformed\startup-runtime-1.1.1\res
+com.consensius.controller.app-emoji2-1.3.0-43 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\b13c5823f8c7b3492ccce35b790d4a81\transformed\emoji2-1.3.0\res
+com.consensius.controller.app-core-runtime-2.2.0-44 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\b4f4f0bcd3507509584159a2cebc2b07\transformed\core-runtime-2.2.0\res
+com.consensius.controller.app-foundation-release-45 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\b504f5c482a400dc90eeadbee771e830\transformed\foundation-release\res
+com.consensius.controller.app-datastore-release-46 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\c4bb0fb873d89eb55f28c646dc1fe625\transformed\datastore-release\res
+com.consensius.controller.app-play-services-base-18.1.0-47 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\c4c131eb2dd4739b61edebd806dcfca4\transformed\play-services-base-18.1.0\res
+com.consensius.controller.app-camera-view-1.3.0-48 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\cde1609fcdc66bc69eb5219ca0d7f0ee\transformed\camera-view-1.3.0\res
+com.consensius.controller.app-ui-release-49 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\cedfcdeda882ce5910066bb7cb290990\transformed\ui-release\res
+com.consensius.controller.app-appcompat-resources-1.1.0-50 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\d0277368e86eeff4187b20be9fc2e6eb\transformed\appcompat-resources-1.1.0\res
+com.consensius.controller.app-navigation-common-2.8.9-51 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\e09672682914437cb41325bd65a39543\transformed\navigation-common-2.8.9\res
+com.consensius.controller.app-navigation-runtime-ktx-2.8.9-52 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\e4f391de9afdd86890d338eeca5385f5\transformed\navigation-runtime-ktx-2.8.9\res
+com.consensius.controller.app-lifecycle-livedata-core-2.8.3-53 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\e7977c359eaac67305c6e66d2f0ba047\transformed\lifecycle-livedata-core-2.8.3\res
+com.consensius.controller.app-animation-release-54 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\eaecbe4d8f0f5f9bb0f8873848772d78\transformed\animation-release\res
+com.consensius.controller.app-lifecycle-viewmodel-compose-release-55 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\ed1e63e3beaefd7ef5e4bca249467571\transformed\lifecycle-viewmodel-compose-release\res
+com.consensius.controller.app-datastore-core-release-56 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\f459ed94a3685cc527564c6ed61f5784\transformed\datastore-core-release\res
+com.consensius.controller.app-runtime-release-57 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\f788fa1ffa0cf82fbcb8991ce686c4a9\transformed\runtime-release\res
+com.consensius.controller.app-ui-util-release-58 C:\Users\MSI Thin\.gradle\caches\8.9\transforms\feb7a3998689694b5075a1a8542ab8eb\transformed\ui-util-release\res
+com.consensius.controller.app-pngs-59 D:\Dokumen\Controller projek\Consensius Controller\app\build\generated\res\pngs\release
+com.consensius.controller.app-resValues-60 D:\Dokumen\Controller projek\Consensius Controller\app\build\generated\res\resValues\release
+com.consensius.controller.app-packageReleaseResources-61 D:\Dokumen\Controller projek\Consensius Controller\app\build\intermediates\incremental\release\packageReleaseResources\merged.dir
+com.consensius.controller.app-packageReleaseResources-62 D:\Dokumen\Controller projek\Consensius Controller\app\build\intermediates\incremental\release\packageReleaseResources\stripped.dir
+com.consensius.controller.app-release-63 D:\Dokumen\Controller projek\Consensius Controller\app\build\intermediates\merged_res\release\mergeReleaseResources
+com.consensius.controller.app-main-64 D:\Dokumen\Controller projek\Consensius Controller\app\src\main\res
+com.consensius.controller.app-release-65 D:\Dokumen\Controller projek\Consensius Controller\app\src\release\res
